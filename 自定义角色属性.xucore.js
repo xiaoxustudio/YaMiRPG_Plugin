@@ -198,7 +198,6 @@ class xucore {
     if (ActorManager.list) {
       for (var i in ActorManager.list) {
         let att_v_c = this.compileStr(att_v, Event)
-        console.log(ActorManager.list[i])
         if (ActorManager.list[i].attributes[String(att)] == att_v_c) {
           
           return ActorManager.list[i];

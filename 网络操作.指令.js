@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-08 15:35:33
+ * @LastEditTime: 2023-08-08 21:36:00
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -31,6 +31,7 @@ Post使用注意：
 创建局域网：指定地址和端口
 
 设置局域网监听：
+  成功事件：当有客户端首次连接时处理，发送的数据会存到@result本地变量里面
   监听事件：当有客户端发送数据时处理，发送的数据会存到@result本地变量里面
   断开事件：当有客户端断开连接时处理，@result本地变量存储断开的连接
 
@@ -54,8 +55,8 @@ Post使用注意：
 
 关闭客户端
 
-@option rootop {"web_op","lan_op"}
-@alias 操作 {网页操作,局域网操作}
+@option rootop {"web_op","lan_op","parse_op"}
+@alias 操作 {网页操作,局域网操作,解析取值操作}
 
 @option web_op_root {"http_get","http_post","parse_label"}
 @alias 数据操作 {请求get,请求post,取标签}
@@ -64,6 +65,11 @@ Post使用注意：
 @option lan_op_root {"local_server","local_server_listening","server_send","get_server_list","close_server","local_client","local_client_listening","client_send","close_client"}
 @alias 数据操作 {创建局域网,设置局域网监听,局域网发送数据,获取局域网连接列表,关闭局域网,创建客户端,设置客户端监听,客户端发送数据,关闭客户端}
 @cond rootop {"lan_op"}
+
+
+@option parse_op_root {"parse_data","object_get_value"}
+@alias 数据操作 {解析数据,对象取值}
+@cond rootop {"parse_op"}
 
 @string http_url
 @alias 请求地址
@@ -138,6 +144,12 @@ Post使用注意：
 @default 8080
 @cond lan_op_root {"local_client"}
 
+
+@option send_type {"string","other"}
+@alias 信息类型 {字符串,其他}
+@cond lan_op_root {"server_send","client_send"}
+
+
 @string msg
 @alias 信息
 @cond lan_op_root {"server_send","client_send"}
@@ -150,7 +162,7 @@ Post使用注意：
 @file event_success
 @filter event
 @alias 成功事件
-@cond lan_op_root {"local_client"}
+@cond lan_op_root {"local_client","local_server_listening"}
 
 @file event_fail
 @filter event
@@ -172,6 +184,29 @@ Post使用注意：
 @alias 存储到本地变量
 @cond lan_op_root {"get_server_list"}
 
+
+
+@string parse_data_var
+@alias 解析的本地变量
+@cond parse_op_root {"parse_data"}
+
+@string parse_data_var_after
+@alias 解析后存储的本地变量
+@cond parse_op_root {"parse_data"}
+
+
+
+@string obj_save_var_before
+@alias 要取值本地变量
+@cond parse_op_root {"object_get_value"}
+
+@string obj_save_var_expression
+@alias 取值表达式
+@cond parse_op_root {"object_get_value"}
+
+@string obj_save_var_after
+@alias 解析后存储的本地变量
+@cond parse_op_root {"object_get_value"}
 
 */
 const request = require("request");
@@ -195,10 +230,12 @@ class Server_xr {
   socket;
   Master;
   event;
+  connect_event;
   event_close;
   event_closed;
   constructor({ host, port, fum }) {
     this.event = () => {};
+    this.connect_event = () => {};
     this.event_close = () => {};
     this.event_closed = () => {
       const index = this.list.indexOf(this.socket);
@@ -212,7 +249,8 @@ class Server_xr {
     this.Master = net.Socket();
     this.Master.connect(port, host, () => {});
   }
-  send(msg, id = null, event) {
+  send(msg, id = null, event, type = "string") {
+    console.log(msg);
     // 将字符串里面的变量编译为文本
     let regex = /<(.*?):(.*?)>+/g;
     let matches = [];
@@ -221,21 +259,61 @@ class Server_xr {
       matches.push({ type: match[1], content: match[2] });
     }
     for (let i in matches) {
-      msg = String(msg).replace(
-        "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-        matches[i]["type"] == "local"
-          ? event.attributes[matches[i]["content"]]
-          : get_glocal(matches[i]["content"])
-      );
+      if (matches[i]["type"] == "local") {
+        if (typeof event.attributes[matches[i]["content"]] == "object") {
+          let data = event.attributes[matches[i]["content"]];
+          let ms_l = {};
+          for (let obj_name in data) {
+            if (typeof data[obj_name] != "object") {
+              ms_l[obj_name] = data[obj_name];
+            }
+          }
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            JSON.stringify(ms_l)
+          );
+        } else {
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            event.attributes[matches[i]["content"]]
+          );
+        }
+      }
+
+      if (matches[i]["type"] == "global") {
+        if (typeof get_glocal(matches[i]["content"]) == "object") {
+          let data = get_glocal(matches[i]["content"]);
+          let ms_l = {};
+          for (let obj_name in data) {
+            if (typeof data[obj_name] != "object") {
+              ms_l[obj_name] = data[obj_name];
+            }
+          }
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            JSON.stringify(ms_l)
+          );
+        } else {
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            get_glocal(matches[i]["content"])
+          );
+        }
+      }
     }
     id = id != 0 ? event.attributes?.[String(id)] : id;
+    let ms_pack = {
+      type: type,
+      value: msg,
+    };
     if (id && id != 0) {
       for (let i in this.list) {
-        if (Number(id) == this.list[i].remotePort) this.list[i].write(msg);
+        if (Number(id) == this.list[i].remotePort)
+          this.list[i].write(JSON.stringify(ms_pack));
       }
     } else {
       for (let i in this.list) {
-        this.list[i].write(msg);
+        this.list[i].write(JSON.stringify(ms_pack));
       }
     }
   }
@@ -280,7 +358,7 @@ class Client_xr {
       }
     });
   }
-  send(msg) {
+  send(msg, event, type = "string") {
     // 将字符串里面的变量编译为文本
     let regex = /<(.*?):(.*?)>+/g;
     let matches = [];
@@ -289,14 +367,53 @@ class Client_xr {
       matches.push({ type: match[1], content: match[2] });
     }
     for (let i in matches) {
-      msg = String(msg).replace(
-        "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-        matches[i]["type"] == "local"
-          ? event.attributes[matches[i]["content"]]
-          : get_glocal(matches[i]["content"])
-      );
+      if (matches[i]["type"] == "local") {
+        if (typeof event.attributes[matches[i]["content"]] == "object") {
+          let data = event.attributes[matches[i]["content"]];
+          let ms_l = {};
+          for (let obj_name in data) {
+            if (typeof data[obj_name] != "object") {
+              ms_l[obj_name] = data[obj_name];
+            }
+          }
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            JSON.stringify(ms_l)
+          );
+        } else {
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            event.attributes[matches[i]["content"]]
+          );
+        }
+      }
+
+      if (matches[i]["type"] == "global") {
+        if (typeof get_glocal(matches[i]["content"]) == "object") {
+          let data = get_glocal(matches[i]["content"]);
+          let ms_l = {};
+          for (let obj_name in data) {
+            if (typeof data[obj_name] != "object") {
+              ms_l[obj_name] = data[obj_name];
+            }
+          }
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            JSON.stringify(ms_l)
+          );
+        } else {
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            get_glocal(matches[i]["content"])
+          );
+        }
+      }
     }
-    return this.client.write(msg);
+    let ms_pack = {
+      type: type,
+      value: JSON.stringify(msg),
+    };
+    return this.client.write(JSON.stringify(ms_pack));
   }
   end() {
     this.client.destroy();
@@ -310,7 +427,7 @@ class Client_xr {
   }
   receive_data(fn = () => {}) {
     this.client.on("data", function (data) {
-      fn.call(this, data.toString());
+      fn.call(this, data);
     });
   }
 }
@@ -454,6 +571,10 @@ export default class Http_Op {
 
           // s.pipe(s)
           local_server_object.socket = s;
+          local_server_object.server.on(
+            "connection",
+            local_server_object.connect_event
+          );
           s.on("data", local_server_object.event);
           s.on("close", local_server_object.event_closed);
           s.on("error", (err) => {
@@ -469,12 +590,25 @@ export default class Http_Op {
   }
 
   setListening(id, id1, id2) {
+    local_server_object.connect_event = (data) => {
+      const commands = EventManager.guidMap[id];
+      if (commands) {
+        Callback.push(() => {
+          let hder = new EventHandler(commands);
+          hder.attributes[String("@result")] = {
+            ip: data.remoteAddress,
+            port: data.remotePort,
+          };
+          EventHandler.call(hder);
+        });
+      }
+    };
     local_server_object.event = (data) => {
       const commands = EventManager.guidMap[id1];
       if (commands) {
         Callback.push(() => {
           let hder = new EventHandler(commands);
-          hder.attributes[String("@result")] = data;
+          hder.attributes[String("@result")] = data.toString();
           EventHandler.call(hder);
         });
       }
@@ -497,12 +631,15 @@ export default class Http_Op {
   }
 
   setClientListening(id, id1) {
-    local_client_object.receive_data((a) => {
+    local_client_object.receive_data((data) => {
       const commands = EventManager.guidMap[id1];
       if (commands) {
         Callback.push(() => {
           let hder = new EventHandler(commands);
-          hder.attributes[String("@result")] = a;
+          hder.attributes[String("@result")] =
+            JSON.parse(data).type == "string"
+              ? JSON.parse(data).value
+              : JSON.parse(JSON.parse(data).value);
           EventHandler.call(hder);
         });
       }
@@ -518,6 +655,15 @@ export default class Http_Op {
       }
     });
     local_client_object.n_server((a) => {});
+  }
+
+  is_json(str){
+    try {
+      JSON.parse(str);
+      return true;
+    } catch(e) {
+      return false;
+    }
   }
 
   call() {
@@ -560,7 +706,7 @@ export default class Http_Op {
           case "local_server_listening":
             if (local_server_object) {
               this.setListening(
-                this.event_fail,
+                this.event_success,
                 this.event_listening,
                 this.event_close
               );
@@ -568,7 +714,12 @@ export default class Http_Op {
             break;
           case "server_send":
             if (local_server_object) {
-              local_server_object.send(this.msg, this.msg_id, Event);
+              local_server_object.send(
+                this.msg,
+                this.msg_id,
+                Event,
+                this.send_type
+              );
             }
             break;
           case "close_server":
@@ -590,7 +741,7 @@ export default class Http_Op {
             break;
           case "client_send":
             if (local_client_object) {
-              local_client_object.send(this.msg);
+              local_client_object.send(this.msg, Event, this.send_type);
             }
             break;
           case "local_client_listening":
@@ -614,7 +765,41 @@ export default class Http_Op {
             break;
         }
         break;
+      case "parse_op":
+        switch (this.parse_op_root) {
+          case "parse_data":
+            let data = Event.attributes[String(this.parse_data_var)];
+            if (data && this.is_json(data)) {
+              let new_data = eval("("+data+")");
+              new_data.value = JSON.parse(new_data.value);
+              new_data.value = JSON.parse(new_data.value);
+              Event.attributes[String(this.parse_data_var_after)] = new_data;
+            }
+            break;
+          case "object_get_value":
+            if (typeof Event.attributes[String(this.obj_save_var_before)] =="object") {
+              let c_data = String(this.obj_save_var_expression).split(",");
+              let is_start = true;
+              let index = 0;
+              let put_value =
+                Event.attributes[String(this.obj_save_var_before)];
+              while (is_start) {
+                if (c_data.length == index) {
+                  Event.attributes[String(this.obj_save_var_after)] = put_value;
+                  is_start = false;
+                  break;
+                } else {
+                  put_value = put_value[c_data[index]];
+                  index++;
+                }
+              }
+            }
+            break;
+        }
+        break;
     }
   }
-  onStart() {}
+  onStart() {
+    console.log(Party);
+  }
 }

@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-08 21:36:00
+ * @LastEditTime: 2023-08-19 21:17:17
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 网络操作
-@version 1.1
+@version 1.2
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -771,8 +771,10 @@ export default class Http_Op {
             let data = Event.attributes[String(this.parse_data_var)];
             if (data && this.is_json(data)) {
               let new_data = eval("("+data+")");
+              if(new_data.value){
+                new_data.value = JSON.parse(new_data.value);
               new_data.value = JSON.parse(new_data.value);
-              new_data.value = JSON.parse(new_data.value);
+              }
               Event.attributes[String(this.parse_data_var_after)] = new_data;
             }
             break;
@@ -800,6 +802,5 @@ export default class Http_Op {
     }
   }
   onStart() {
-    console.log(Party);
   }
 }

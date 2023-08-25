@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-25 16:13:34
+ * @LastEditTime: 2023-08-25 16:51:28
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -14,15 +14,111 @@
 
 实现局域网之间的通信，可用于实现联机的效果
 
+【服务器操作】
 
+创建服务器：指定地址和端口
+
+监听事件：
+创建失败事件：
+服务器创建失败执行，结果存储到@result
+
+创建成功事件：
+服务器创建成功执行，结果存储到@result
+
+接收数据事件：
+服务器接收到数据执行
+接收结果存储到@result
+对端信息存储到@result1
+
+客户端加入事件：
+客户端信息存储到@result
+
+客户端断开事件：
+客户端信息存储到@result
+
+发送数据
+******单独发送******
+指定ip和端口
+发送消息可使用<local:*><global:*>
+
+******广播发送******
+发送消息到全部连接到该服务器的客户端
+发送消息可使用<local:*><global:*>
+
+关闭服务器
+
+其他操作：
+******是否存在客户端******
+指定IP和端口，可用于查找服务器列表是否有指定客户端的连接
+
+
+【客户端操作】
+
+创建客户端：指定地址和端口
+
+监听事件----------
+连接失败事件：
+客户端连接失败执行，结果存储到@result
+
+连接成功事件：
+客户端连接成功执行，结果存储到@result
+
+接收数据事件：
+客户端接收到数据执行
+接收结果存储到@result
+对端信息存储到@result1
+
+服务器断开事件：
+服务器信息存储到@result
+
+发送数据
+发送消息可使用<local:*><global:*>
+
+关闭客户端
+
+【其他操作】
+对象取值：
+输入指定变量
+对指定变量进行取值（取多层值时，可用英文逗号（,）分割）
+并将取得的结果存储到指定变量
+
+JSON文本转JSON对象：
+输入指定变量
+对指定变量进行转换成JSON对象（如果转换对象不是标准JSON文本则不会进行任何操作）
+并将取得的结果存储到指定变量
+
+解密数据：
+输入文本内容（可使用<local:*><global:*>）
+对指定内容进行解密（Base64）
+并将结果存储到指定变量
+
+解密数据：
+输入文本内容（可使用<local:*><global:*>）
+对指定内容进行加密（Base64）
+并将结果存储到指定变量
+
+是否是服务器：
+判断当前程序是否是服务器
+结果以布尔值的形式存储到指定变量
 
 @option op {'server_op','client_op','other_op',"debug_true","debug_false"}
 @alias 操作 {服务器操作, 客户端操作, 其他操作,开启调试,关闭调试}
 
 
-@option op_sub_other {'get_obj_value','decode_value','encode_value','is_server'}
-@alias 子操作 {对象取值,解密数据,加密数据,是否是服务器}
+@option op_sub_other {'get_obj_value',"parse_value",'decode_value','encode_value','is_server'}
+@alias 子操作 {对象取值,JSON文本转JSON对象,解密数据,加密数据,是否是服务器}
 @cond op {'other_op'}
+
+
+@string parse_data_var
+@alias 解析的本地变量
+@cond op_sub_other {"parse_value"}
+
+@string parse_data_var_after
+@alias 解析后存储的本地变量
+@cond op_sub_other {"parse_value"}
+
+
 
 @string obj_save_var_before
 @alias 要取值本地变量
@@ -208,8 +304,16 @@ class xr {
   static is_func(obj) {
     return typeof obj == "function"
   }
-  static is_server(){
-    return server !=null ? true : false 
+  static is_server() {
+    return server != null ? true : false
+  }
+  static is_json(str) {
+    try {
+      JSON.parse(str);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
   static convertToJSON(object) {
     let cache = [];
@@ -542,6 +646,10 @@ class Clinet_XR {
         }
         delete this.servers[c_index].cache[msg.id]
       }
+      if (Event.attributes[String("@result1")]) {
+        delete Event.attributes[String("@result1")]
+      }
+      Event.attributes[String("@result1")] = rinfo
     });
   }
   send(msg, cbk = () => { }) {
@@ -793,6 +901,10 @@ class Server_XR {
         }
         delete this.clients[c_index].cache[msg.id]
       }
+      if (Event.attributes[String("@result1")]) {
+        delete Event.attributes[String("@result1")]
+      }
+      Event.attributes[String("@result1")] = rinfo
     });
   }
   send(msg, port = this.port, address = this.address, callback = () => { }) {
@@ -984,6 +1096,12 @@ export default class Online_XR {
         break
       case "other_op":
         switch (this.op_sub_other) {
+          case "parse_value":
+            let data = Event.attributes[String(this.parse_data_var)];
+            if (xr.is_json(data)) {
+              Event.attributes[String(this.parse_data_var_after)] = JSON.parse(data);
+            }
+            break
           case "is_server":
             if (Event.attributes[String(this.exist_var_content)]) {
               delete Event.attributes[String(this.exist_var_content)]
@@ -1036,5 +1154,5 @@ export default class Online_XR {
   onStart() {
     xr.showInfo()
   }
-  
+
 }

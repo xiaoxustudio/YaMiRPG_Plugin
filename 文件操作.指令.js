@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-26 20:04:49
+ * @LastEditTime: 2023-08-26 22:20:04
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -158,6 +158,8 @@ class File_xr {
     } else if (text.startsWith("%")) {
       text = text.slice(1, text.length)
       return File.route("") + "\\" + text
+    }else{
+      return  text
     }
   }
 }

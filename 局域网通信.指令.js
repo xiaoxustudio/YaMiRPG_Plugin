@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-28 13:36:06
+ * @LastEditTime: 2023-08-28 15:23:45
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -257,11 +257,11 @@ JSON文本转JSON对象：
 @default ''
 @cond send_msg_server_type {'only_send',"broadcast_send"}
 
-@number send_port_server
+@string send_port_server
 @alias 发送客户端端口
 @cond send_msg_server_type {'only_send'}
 
-@number send_address_server
+@string send_address_server
 @alias 发送客户端地址
 @cond send_msg_server_type {'only_send'}
 
@@ -939,6 +939,8 @@ class Server_XR {
     });
   }
   send(msg, port = this.port, address = this.address, callback = () => { }) {
+    port = xr.compileVar(port)
+    address = xr.compileVar(address)
     for (let i in this.clients) {
       let client = this.clients[i].socket
       if (this.port == client.port && this.address == client.address) {

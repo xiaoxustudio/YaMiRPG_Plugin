@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-25 16:51:28
+ * @LastEditTime: 2023-08-28 13:36:06
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 局域网通信
-@version 0.1
+@version 0.2
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -82,6 +82,12 @@
 对指定变量进行取值（取多层值时，可用英文逗号（,）分割）
 并将取得的结果存储到指定变量
 
+对象取值：
+将对象的值进行替换
+
+调用事件：
+调用事件，可以同步变量池
+
 JSON文本转JSON对象：
 输入指定变量
 对指定变量进行转换成JSON对象（如果转换对象不是标准JSON文本则不会进行任何操作）
@@ -105,9 +111,34 @@ JSON文本转JSON对象：
 @alias 操作 {服务器操作, 客户端操作, 其他操作,开启调试,关闭调试}
 
 
-@option op_sub_other {'get_obj_value',"parse_value",'decode_value','encode_value','is_server'}
-@alias 子操作 {对象取值,JSON文本转JSON对象,解密数据,加密数据,是否是服务器}
+@option op_sub_other {'get_obj_value',"replace_obj","call_event","parse_value",'decode_value','encode_value','is_server'}
+@alias 子操作 {对象取值,对象替换,调用事件,JSON文本转JSON对象,解密数据,加密数据,是否是服务器}
 @cond op {'other_op'}
+
+@file call_event_id
+@filter event
+@alias 调用事件
+@cond op_sub_other {"call_event"}
+
+@boolean is_share
+@alias 是否同步变量池
+@default true
+@cond op_sub_other {"call_event"}
+
+
+
+@string replace_obj_ori
+@alias 数据源本地变量
+@cond op_sub_other {"replace_obj"}
+
+@string replace_obj_after
+@alias 替换对象名称(key)
+@cond op_sub_other {"replace_obj"}
+
+@string replace_obj_before
+@alias 值替换成对象(value)
+@cond op_sub_other {"replace_obj"}
+
 
 
 @string parse_data_var
@@ -353,7 +384,7 @@ class xr {
     return JSON.stringify({ id: id ? id : 0, pack_num: num ? num : 0, type: type ? type : "chunk", value: obj, data: data.length != 0 ? data : { BufferSize: Math.ceil((obj.length * 1024) * 2) } })
   }
   static to64(str) {
-    return new Buffer.from(str).toString('base64');
+    return new Buffer.from(str).toString('base64');;
   }
   static from64(str) {
     return new Buffer.from(str, 'base64').toString();
@@ -490,6 +521,7 @@ class Clinet_XR {
         Callback.push(() => {
           let hder = new EventHandler(commands);
           hder.attributes[String("@result")] = address
+          hder.attributes[String("@result1")] = { port: this.port, address: this.address }
           EventHandler.call(hder);
         });
       }
@@ -614,6 +646,7 @@ class Clinet_XR {
           Callback.push(() => {
             let hder = new EventHandler(commands);
             hder.attributes[String("@result")] = msg
+            hder.attributes["@result1"] = rinfo
             EventHandler.call(hder);
           });
         }
@@ -641,15 +674,13 @@ class Clinet_XR {
               value: xr.from64(str_to),
               data: {}
             }
+            hder.attributes["@result1"] = rinfo
             EventHandler.call(hder);
           });
         }
         delete this.servers[c_index].cache[msg.id]
       }
-      if (Event.attributes[String("@result1")]) {
-        delete Event.attributes[String("@result1")]
-      }
-      Event.attributes[String("@result1")] = rinfo
+
     });
   }
   send(msg, cbk = () => { }) {
@@ -678,7 +709,6 @@ class Clinet_XR {
       })
     })
     msg = xr.compileVar(msg)
-
     // 要发送的数据
     let send_string = xr.to64(msg)
     const size = 1024  // 数据包大小
@@ -869,6 +899,7 @@ class Server_XR {
           Callback.push(() => {
             let hder = new EventHandler(commands);
             hder.attributes[String("@result")] = msg
+            hder.attributes["@result1"] = rinfo
             EventHandler.call(hder);
           });
         }
@@ -1100,6 +1131,8 @@ export default class Online_XR {
             let data = Event.attributes[String(this.parse_data_var)];
             if (xr.is_json(data)) {
               Event.attributes[String(this.parse_data_var_after)] = JSON.parse(data);
+            }else{
+              Event.attributes[String(this.parse_data_var_after)] = "not json";
             }
             break
           case "is_server":
@@ -1141,6 +1174,20 @@ export default class Online_XR {
               }
             }
             break
+          case "replace_obj":
+            let af = Event.attributes[String(this.replace_obj_after)]
+            let be = Event.attributes[String(this.replace_obj_before)]
+            Event.attributes[String(this.replace_obj_ori)][af] = be
+            break
+          case "call_event":
+            const commands = EventManager.guidMap[this.call_event_id];
+            if (this.is_share) {
+              if (commands) {
+                let hder = new EventHandler(commands);
+                hder.attributes = Event.attributes
+                EventHandler.call(hder);
+              }
+            }
         }
         break
       case "debug_true":

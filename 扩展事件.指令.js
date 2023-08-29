@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-20 22:27:26
+ * @LastEditTime: 2023-08-29 14:26:37
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -16,7 +16,7 @@
 弹出系统通知
 调用CMD命令：
 指令用空格分开
-
+结果以列表的形式返回
 
 
 【其他】
@@ -36,12 +36,28 @@ aes128：
 @option op {"base", "other"}
 @alias 操作 {基础, 其他}
 
-@option op_base {"os_message","callcmd"}
-@alias 基础操作 {弹出系统通知,调用CMD命令}
+@option op_base {"os_message","callcmd","call_event"}
+@alias 基础操作 {弹出系统通知,调用CMD命令,调用事件}
 @cond op {"base"}
+
+@file call_event_id
+@filter event
+@alias 调用事件
+@cond op_base {"call_event"}
+
+@boolean is_share
+@alias 是否同步变量池
+@default true
+@cond op_base {"call_event"}
+
+
 
 @string cmd_string
 @alias 指令(空格分开)
+@cond op_base {"callcmd"}
+
+@string cmd_result
+@alias 结果存储变量
 @cond op_base {"callcmd"}
 
 @string msg_title
@@ -128,7 +144,7 @@ const crypto = require('node:crypto');
 const { Notification } = require('electron')
 const spawn = require("child_process").spawn;
 
-const  iconvLite = require('iconv-lite');
+const iconvLite = require('iconv-lite');
 
 export default class encrypt_xr {
     type
@@ -231,9 +247,24 @@ export default class encrypt_xr {
                             body: this.msg_content,
                         }, EventManager.guidMap[this.msg_onclik])
                         break
-                        case "callcmd":
+                    case "callcmd":
                         let arr = new String(this.cmd_string).toString().split(" ")
-                        this.callCMD(arr)
+                        this.callCMD(arr, this.cmd_result, Event)
+                        break
+                    case "call_event":
+                        const commands = EventManager.guidMap[this.call_event_id];
+                        if (this.is_share) {
+                            if (commands) {
+                                let hder = new EventHandler(commands);
+                                hder.attributes = Event.attributes
+                                EventHandler.call(hder);
+                            }
+                        } else {
+                            if (commands) {
+                                let hder = new EventHandler(commands);
+                                EventHandler.call(hder);
+                            }
+                        }
                         break
                 }
                 break
@@ -266,24 +297,28 @@ export default class encrypt_xr {
             if (onclick) EventHandler.call(new EventHandler(onclick))
         }
     }
-    callCMD(cmd_string){
+    callCMD(cmd_string, cmd_result, ev) {
         let zl = cmd_string[0]
-        cmd_string.splice(0,1)
-        cmd_string.splice(0,1)
-        let result = spawn(zl,cmd_string);
-
+        cmd_string.splice(0, 1)
+        cmd_string.splice(0, 1)
+        let result = spawn(zl, cmd_string);
         //输出正常情况下的控制台信息
         result.stdout.on("data", function (data) {
-            console.log(iconvLite.decode(data, 'cp936'));
+            if (!ev.attributes.hasOwnProperty(cmd_result)) ev.attributes[cmd_result] = []
+            if (!ev.attributes?.[cmd_result] instanceof Array) ev.attributes[cmd_result] = []
+            ev.attributes[cmd_result].push(iconvLite.decode(data, 'cp936'))
+            // console.log(iconvLite.decode(data, 'cp936'));
         });
 
         //输出报错信息
         result.stderr.on("data", function (data) {
-            console.log("stderr:"+iconvLite.decode(data, 'cp936'));
+            if (!ev.attributes.hasOwnProperty(cmd_result)) ev.attributes[cmd_result] = []
+            if (!ev.attributes?.[cmd_result] instanceof Array) ev.attributes[cmd_result] = []
+            ev.attributes[cmd_result].push(iconvLite.decode(data, 'cp936'))
+            // console.log("stderr:"+iconvLite.decode(data, 'cp936'));
         });
-
         result.on("exit", function (code) {
-            console.log("child process exited with code :"+code);
+            console.log("child process exited with code :" + code);
         });
     }
     onStart() {

@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-28 15:23:45
+ * @LastEditTime: 2023-08-29 14:28:19
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -1189,6 +1189,11 @@ export default class Online_XR {
                 hder.attributes = Event.attributes
                 EventHandler.call(hder);
               }
+            }else{
+              if (commands) {
+                let hder = new EventHandler(commands);
+                EventHandler.call(hder);
+            }
             }
         }
         break

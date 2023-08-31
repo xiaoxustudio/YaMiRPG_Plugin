@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-26 22:20:04
+ * @LastEditTime: 2023-08-31 18:20:00
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -19,14 +19,21 @@ $ ： 指向当前Assets文件夹
 % ： 指向当前工程项目文件夹
 
 
-@option op {'read_file','write_file','exist_file'}
-@alias 操作 {读取文件,写入文件,文件是否存在}
-
+@option op {'read_file','write_file','exist_file','show_file'}
+@alias 操作 {读取文件,写入文件,文件是否存在,列出目录}
 
 @string file_path
 @alias 文件路径
-@cond op {'read_file','write_file','exist_file'}
+@cond op {'read_file','write_file','exist_file','show_file'}
 
+@string show_save_var
+@alias 保存变量
+@cond op {'show_file'}
+
+@boolean show_add_prefix 
+@alias 路径加上父目录
+@default false
+@cond op {'show_file'}
 
 @option op_path_type {'txt','json'}
 @alias 文件保存类型 {text,json}
@@ -37,6 +44,7 @@ $ ： 指向当前Assets文件夹
 @string save_var
 @alias 内容保存变量
 @cond op {'read_file'}
+
 
 @string file_content
 @alias 写入内容
@@ -90,18 +98,18 @@ class File_xr {
       return null
     }
   }
-  static write(path, text, create = false,append = false) {
+  static write(path, text, create = false, append = false) {
     let is_e = fs.existsSync(path)
     let start = String(path).lastIndexOf("\\")
     if (create) {
       if (!is_e) File_xr.MkdirsSync(String(path).slice(0, start))
     }
     try {
-      if(!append){
+      if (!append) {
         fs.writeFileSync(path, text, { encoding: "utf-8" })
       }
-      else{
-        fs.appendFileSync(path, text,{ encoding: "utf-8" })
+      else {
+        fs.appendFileSync(path, text, { encoding: "utf-8" })
       }
       return true
     } catch {
@@ -158,8 +166,8 @@ class File_xr {
     } else if (text.startsWith("%")) {
       text = text.slice(1, text.length)
       return File.route("") + "\\" + text
-    }else{
-      return  text
+    } else {
+      return text
     }
   }
 }
@@ -172,11 +180,22 @@ export default class Plugin {
         Event.attributes[this.save_var] = this.op_path_type == "txt" ? data : File_xr.is_json(data) ? JSON.parse(data) : data
         break
       case "write_file":
-        let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false , this.is_append ? true : false )
+        let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false, this.is_append ? true : false)
         Event.attributes[this.save_res_var] = res
         break
-        case "exist_file":
+      case "exist_file":
         Event.attributes[this.save_exist_var] = fs.existsSync(File_xr.compiltePath(this.file_path))
+        break
+      case "show_file":
+        let file_item = fs.readdirSync(this.file_path)
+        if (this.show_add_prefix) {
+          let new_file_item = []
+          for (let i of file_item) {
+            new_file_item.push(this.file_path + "\\" + i)
+          }
+          file_item = new_file_item
+        }
+        Event.attributes[this.show_save_var] = file_item
         break
     }
   }

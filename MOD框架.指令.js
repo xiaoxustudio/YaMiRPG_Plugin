@@ -40,6 +40,12 @@ init文件：
 key = value 格式
 
 
+———————————脚本编写—————————————
+
+被暴露的对象会被存放到MOD_X.OBJ里面，可通过访问对象的方式访问
+
+
+
 @option op {"base_cmd", "run_cmd" , "config_cmd"}
 @alias MOD框架 {基础指令,运行指令, 配置指令}
 
@@ -94,7 +100,7 @@ key = value 格式
 
 const fs = require("fs")
 const path = require("path")
-
+const Console = require("node:console")
 
 class xr {
   static is_json(a) {
@@ -247,52 +253,33 @@ class XR_Console {
       display:"inline-block";
   }
 
-  .obj_root {
-    display: block;
-    user-select: none;
-  }
-  .obj_key {
-    display: inline-block;
-    user-select: none;
-  }
-  .obj_con {
-    display: inline;
-    user-select: none;
-  }
-  .obj_con::after{
-    content :"：";
-    display: inline;
-  }
-  .obj_value {
-    display: inline-block;
-    user-select: none;
+  .wrapper {
+    display: flex;
+    align-items: center;
   }
 
-  .obj_br {
-    display: inline;
-  }
-  .obj_br::after {
-    content: "\\A";
-    display: block;
-    white-space: pre;
+  .indent {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #ccc;
   }
 
-  .obj_nbsp {
-    display: inline;
+  .label {
+    margin-left: 5px;
+    font-weight: bold;
   }
-  .obj_nbsp::after {
-    content: "\\0020";
-    display: inline;
-    white-space: pre;
+
+  .content {
+    margin-left: 10px;
   }
-  .obj_hidden {
-    height: none;
+
+  .expandable .indent {
+    cursor: pointer;
   }
-  .obj_arrows {
-    display: inline-block;
-  }
-  .obj_child {
-    display: inline-block;
+
+  .collapsed {
+    display: none;
   }
     `
     document.head.appendChild(sty)
@@ -339,7 +326,15 @@ class XR_Console {
       } else if (typeof data == "object") {
         let p = document.createElement("p")
         p.className = "result_log"
-        p.appendChild(this.paseOBJ(data))
+        if (!this.hasLoop(data)) {
+          this.paseOBJ(data, p, 0, "#fff")
+        } else {
+          let output = fs.createWriteStream('./stdout.log');
+          let errorOutput = fs.createWriteStream('./stderr.log');
+          let logger = new Console.Console({ stdout: output, stderr: errorOutput })
+          logger.dir(data);
+          p.innerHTML = "对象已输出到日志"
+        }
         this.div_content.appendChild(p)
       } else {
         let p = document.createElement("p")
@@ -369,70 +364,113 @@ class XR_Console {
     // 如果传入值是对象，则执行判断，否则返回false
     return typeof obj === 'object' ? findLoop(obj, []) : false
   }
+  computeColor(parentColor, level) {
+    let increment = 0.01;
+    let colorValue = Math.round(level * increment * 255);
+    let color = 'rgb(' + colorValue + ', ' + colorValue + ', ' + colorValue + ')';
 
-  paseOBJ(obj, index = 1) {
-    let obj_root
-    if (typeof obj == "object") {
-      // 记录对象（防止对象重复迭代）
-      let stack = []
-      obj_root = document.createElement("div")
-      obj_root.className = "obj_root"
-      for (let i in obj) {
-        if (typeof obj[i] == "object") {
-          let obj_key = document.createElement("div")
-          obj_key.className = "obj_key"
-          obj_key.innerHTML = i
-          let obj_con = document.createElement("div")
-          obj_con.className = "obj_con"
-          let obj_value = document.createElement("div")
-          obj_value.className = "obj_value"
-          // 不是已经迭代过的对象
-          let f_obj = this.hasLoop(obj[i])
-          if (!f_obj) {
-            //生成空格
-            for (let ik = 0; ik < index; ik++) {
-              let obj_nbsp = document.createElement("div")
-              obj_nbsp.className = "obj_nbsp"
-              obj_value.appendChild(obj_nbsp)
-            }
-            //————————
-            let obj_arrows = document.createElement("div")
-            obj_arrows.className = "obj_arrows"
-            obj_value.appendChild(obj_arrows)
-            obj_value.appendChild(this.paseOBJ(obj[i], ++index))
-            obj_root.appendChild(obj_key)
-            obj_root.appendChild(obj_con)
-            obj_root.appendChild(obj_value)
-            stack.push(obj[i])
+    if (parentColor) {
+      let r = parseInt(parentColor.substring(1, 3), 16);
+      let g = parseInt(parentColor.substring(3, 5), 16);
+      let b = parseInt(parentColor.substring(5, 7), 16);
+
+      r += colorValue;
+      g += colorValue;
+      b += colorValue;
+
+      r = Math.min(r, 255);
+      g = Math.min(g, 255);
+      b = Math.min(b, 255);
+
+      color = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+    }
+
+    return color;
+  }
+  paseOBJ(data, parentElement, level, parentColor) {
+    for (let key in data) {
+      let value = data[key];
+      let isObject = typeof value === 'object';
+
+      // 创建元素
+      let wrapper = document.createElement('div');
+      let indent = document.createElement('span');
+      let label = document.createElement('span');
+      let content = document.createElement('span');
+
+      // 添加样式和内容
+      wrapper.classList.add('wrapper');
+      indent.classList.add('indent');
+      label.classList.add('label');
+      content.classList.add('content');
+      label.textContent = key;
+
+      // 设置缩进
+      indent.style.width = level * 20 + 'px';
+
+      // 计算子层背景颜色
+      let currentColor = this.computeColor(parentColor, level);
+
+      // 给子层添加背景颜色
+      if (isObject) {
+        wrapper.style.backgroundColor = currentColor;
+      }
+
+      // 添加伸展收缩行为
+      if (isObject && value ? Object.keys(value).length > 0 : false) {
+        let button = document.createElement('button');
+        button.innerText = '+';
+        button.classList.add('expandable-button');
+        button.addEventListener('click', function (e) {
+          content.classList.toggle('collapsed');
+          if (button.innerText === '+') {
+            button.innerText = '-';
           } else {
-            obj_key.innerHTML = "重复迭代对象:"
-            obj_value.innerHTML = f_obj
-            obj_root.appendChild(obj_key)
-            obj_root.appendChild(obj_con)
-            obj_root.appendChild(obj_value)
+            button.innerText = '+';
           }
-        } else {
-          let obj_key = document.createElement("div")
-          obj_key.className = "obj_key"
-          obj_key.innerHTML = i
-          let obj_con = document.createElement("div")
-          obj_con.className = "obj_con"
-          let obj_value = document.createElement("div")
-          obj_value.className = "obj_value"
-          obj_value.innerHTML = obj[i]
+        });
+        wrapper.appendChild(button);
+        content.classList.add('collapsed'); // 添加 collapsed 类
+      }
 
-          let obj_br = document.createElement("div")
-          obj_br.className = "obj_br"
+      if (isObject) {
+        if (this.hasLoop(value)) {
+          content.textContent = '{';
+          let text = document.createElement('span');
+          text.innerHTML = "重复索引对象"
+          let closingBracket = document.createElement('span');
+          closingBracket.textContent = '}';
+          content.appendChild(text);
+          content.appendChild(closingBracket);
+          // 添加阻止事件冒泡方法
+          content.addEventListener('click', function (e) {
+            e.stopPropagation();
+          });
+        }
+        else {
+          content.textContent = '{';
+          this.paseOBJ(value, content, level + 1, currentColor);
+          let closingBracket = document.createElement('span');
+          closingBracket.textContent = '}';
+          content.appendChild(closingBracket);
 
-          obj_root.appendChild(obj_key)
-          obj_root.appendChild(obj_con)
-          obj_root.appendChild(obj_value)
-          obj_root.appendChild(obj_br)
+          // 添加阻止事件冒泡方法
+          content.addEventListener('click', function (e) {
+            e.stopPropagation();
+          });
         }
 
+      } else {
+        content.textContent = value;
       }
+
+      // 将元素添加到父元素中
+      wrapper.appendChild(indent);
+      wrapper.appendChild(label);
+      wrapper.appendChild(content);
+      parentElement.appendChild(wrapper);
     }
-    return obj_root
+    return parentElement
   }
   loading() {
     let div_bar = document.createElement("div")
@@ -591,7 +629,7 @@ class MOD_Manager {
         this.js_list[file.substring(String(file).lastIndexOf("\\") + 1, file.length)] = new Function(this.next() + fs.readFileSync(file).toString("utf-8"))
         return true
       }
-      catch(e) {
+      catch (e) {
         console.log("脚本" + file.substring(String(file).lastIndexOf("\\") + 1, file.length) + "加载失败")
         debug.log("脚本" + file.substring(String(file).lastIndexOf("\\") + 1, file.length) + "加载失败")
         return false

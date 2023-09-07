@@ -20,7 +20,6 @@
 @boolean start_pos_bool
 @alias 起点转换场景坐标
 @default true
-@desc Hello World
 
 @position-getter end_pos
 @alias 框选终点
@@ -28,7 +27,6 @@
 @boolean end_pos_bool
 @alias 终点转换场景坐标
 @default true
-@desc Hello World
 
 @string save_var
 @default '@actors'

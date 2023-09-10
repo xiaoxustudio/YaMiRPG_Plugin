@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-19 21:17:17
+ * @LastEditTime: 2023-09-10 21:07:50
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 网络操作
-@version 1.2
+@version 1.3
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -24,7 +24,7 @@ get使用注意：
 
 Post使用注意：
   请求参数列表：
-  如有多个请用&分割，入a=123&n=123
+  如有多个请用&分割，入a=123&n=123（可使用<local|global:var_name>）
 
 
 ——————————局域网操作——————————
@@ -211,17 +211,146 @@ Post使用注意：
 */
 const request = require("request");
 const net = require("net");
-
-// 按照变量名获取全局变量
-function get_glocal(str) {
-  for (let i in Variable.groups) {
-    for (let k in Variable.groups[i]) {
-      if (str == Variable.groups[i][k].name) {
-        return Variable.groups[i][k].value;
-      }
+class xr {
+  static showInfo() {
+    console.log(
+      `   ____         __   __                      \n` +
+      `  |  _ \\        \\ \\ / /                      \n` +
+      `  | |_) |_   _   \\ V /_   _ _ __ __ _ _ __   \n` +
+      `  |  _ <| | | |   > <| | | | '__/ _\` | '_ \\  \n` +
+      `  | |_) | |_| |  / . \\ |_| | | | (_| | | | | \n` +
+      `  |____/ \\__, | /_/ \\_\\__,_|_|  \\__,_|_| |_| \n` +
+      `          __/ |                              \n` +
+      `         |___/                               \n` +
+      "\n\n对象设置\n\n" +
+      "🏠b站：https://space.bilibili.com/291565199\n\n" +
+      "📞github：https://github.com/xiaoxustudio\n\n" +
+      "🌒官网：www.xiaoxustudio.top\n\n"
+    )
+  }
+  static is_obj(obj) {
+    return typeof obj == "object"
+  }
+  static is_func(obj) {
+    return typeof obj == "function"
+  }
+  static is_server() {
+    return server != null ? true : false
+  }
+  static is_json(str) {
+    try {
+      JSON.parse(str);
+      return true;
+    } catch (e) {
+      return false;
     }
   }
-  return null;
+  static convertToJSON(object) {
+    let cache = [];
+
+    let json = JSON.stringify(object, function (key, value) {
+      if (typeof value === 'object' && value !== null) {
+        if (cache.includes(value)) {
+          return '';
+        }
+        cache.push(value);
+      }
+      return value;
+    });
+
+    cache = null; // 清空 cache
+
+    return json;
+  }
+  static get_global(str) {
+    for (let i in Variable.groups) {
+      for (let k in Variable.groups[i]) {
+        if (str == Variable.groups[i][k].name) {
+          return Variable.groups[i][k].value;
+        }
+      }
+    }
+    return null;
+  }
+  static uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0,
+        v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+  static CompileData(obj, id = null, num = null, type = null, data = {}) {
+    return JSON.stringify({ id: id ? id : 0, pack_num: num ? num : 0, type: type ? type : "chunk", value: obj, data: data.length != 0 ? data : { BufferSize: Math.ceil((obj.length * 1024) * 2) } })
+  }
+  static to64(str) {
+    return new Buffer.from(str).toString('base64');;
+  }
+  static from64(str) {
+    return new Buffer.from(str, 'base64').toString();
+  }
+  static compile(r) {
+    let commands = [...Event.commands];
+    commands.unshift(Command.compile(r, () => { })[0]);
+    let eh = new EventHandler(Command.compile(r, () => { }));
+    EventHandler.call(eh);
+  }
+  static compileVar(msg) {
+    // 将字符串里面的变量编译为文本
+    let regex = /<(.*?):(.*?)>+/g;
+    let matches = [];
+    let match;
+    while ((match = regex.exec(msg)) !== null) {
+      matches.push({ type: match[1], content: match[2] });
+    }
+    for (let i in matches) {
+      if (matches[i]["type"] == "local") {
+        if (typeof Event.attributes[matches[i]["content"]] == "object") {
+          let data = Event.attributes[matches[i]["content"]];
+          let ms_l = {};
+          for (let obj_name in data) {
+            if (typeof data[obj_name] != "object") {
+              ms_l[obj_name] = data[obj_name];
+            } else {
+              ms_l[obj_name] = xr.convertToJSON(data[obj_name])
+            }
+          }
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            xr.convertToJSON(ms_l)
+          );
+        } else {
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            Event.attributes[matches[i]["content"]]
+          );
+        }
+      }
+
+      if (matches[i]["type"] == "global") {
+        if (typeof xr.get_global(matches[i]["content"]) == "object") {
+          let data = xr.get_global(matches[i]["content"]);
+          let ms_l = {};
+          for (let obj_name in data) {
+            if (typeof data[obj_name] != "object") {
+              ms_l[obj_name] = data[obj_name];
+            } else {
+              ms_l[obj_name] = xr.convertToJSON(data[obj_name])
+            }
+          }
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            xr.convertToJSON(ms_l)
+          );
+        } else {
+          msg = String(msg).replace(
+            "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+            xr.get_global(matches[i]["content"])
+          );
+        }
+      }
+    }
+    return msg
+  }
 }
 
 class Server_xr {
@@ -281,8 +410,8 @@ class Server_xr {
       }
 
       if (matches[i]["type"] == "global") {
-        if (typeof get_glocal(matches[i]["content"]) == "object") {
-          let data = get_glocal(matches[i]["content"]);
+        if (typeof get_global(matches[i]["content"]) == "object") {
+          let data = get_global(matches[i]["content"]);
           let ms_l = {};
           for (let obj_name in data) {
             if (typeof data[obj_name] != "object") {
@@ -296,7 +425,7 @@ class Server_xr {
         } else {
           msg = String(msg).replace(
             "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-            get_glocal(matches[i]["content"])
+            get_global(matches[i]["content"])
           );
         }
       }
@@ -389,8 +518,8 @@ class Client_xr {
       }
 
       if (matches[i]["type"] == "global") {
-        if (typeof get_glocal(matches[i]["content"]) == "object") {
-          let data = get_glocal(matches[i]["content"]);
+        if (typeof xr.get_global(matches[i]["content"]) == "object") {
+          let data = xr.get_global(matches[i]["content"]);
           let ms_l = {};
           for (let obj_name in data) {
             if (typeof data[obj_name] != "object") {
@@ -404,7 +533,7 @@ class Client_xr {
         } else {
           msg = String(msg).replace(
             "<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-            get_glocal(matches[i]["content"])
+            get_global(matches[i]["content"])
           );
         }
       }
@@ -477,7 +606,8 @@ export default class Http_Op {
       console.error(xhr.statusText);
     };
     if (type_c == "POST") {
-      xhr.send(this.post_list);
+      let msg = xr.compileVar(this.post_list)
+      xhr.send(msg);
     } else {
       xhr.send(null);
     }

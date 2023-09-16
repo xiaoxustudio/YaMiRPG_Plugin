@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-08-31 18:20:00
+ * @LastEditTime: 2023-09-16 22:23:41
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -69,11 +69,16 @@ $ ： 指向当前Assets文件夹
 @alias 结果变量
 @cond op {'exist_file'}
 
+@option op_encoding {'utf-8','utf8','ascii','base64','base64url','binary','hex','latin1','ucs-2','ucs2','utf16le'}
+@alias 文件编码 {utf-8,utf8,ascii,base64,base64url,binary,hex,latin1,ucs-2,ucs2,utf16le}
+@default utf-8
+@cond op {'read_file','write_file'}
+
 */
 
 const fs = require("fs")
 const path = require('path');
-
+const iconv = require('iconv-lite');
 
 class File_xr {
   promise
@@ -91,14 +96,15 @@ class File_xr {
       }
     }
   }
-  static read(path) {
+  static read(path, en) {
     try {
-      return fs.readFileSync(path, { encoding: "utf-8" })
+      const str = fs.readFileSync(path, { encoding: en });
+      return String(str)
     } catch {
       return null
     }
   }
-  static write(path, text, create = false, append = false) {
+  static write(path, text, create = false, append = false, en = "utf-8") {
     let is_e = fs.existsSync(path)
     let start = String(path).lastIndexOf("\\")
     if (create) {
@@ -106,10 +112,10 @@ class File_xr {
     }
     try {
       if (!append) {
-        fs.writeFileSync(path, text, { encoding: "utf-8" })
+        fs.writeFileSync(path, text, { encoding: en })
       }
       else {
-        fs.appendFileSync(path, text, { encoding: "utf-8" })
+        fs.appendFileSync(path, text, { encoding: en })
       }
       return true
     } catch {
@@ -176,11 +182,11 @@ export default class Plugin {
   call() {
     switch (this.op) {
       case "read_file":
-        var data = File_xr.read(File_xr.compiltePath(this.file_path))
+        var data = File_xr.read(File_xr.compiltePath(this.file_path),this.op_encoding)
         Event.attributes[this.save_var] = this.op_path_type == "txt" ? data : File_xr.is_json(data) ? JSON.parse(data) : data
         break
       case "write_file":
-        let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false, this.is_append ? true : false)
+        let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false, this.is_append ? true : false,this.op_encoding)
         Event.attributes[this.save_res_var] = res
         break
       case "exist_file":

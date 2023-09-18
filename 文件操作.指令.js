@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-09-16 22:23:41
+ * @LastEditTime: 2023-09-18 23:37:47
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -69,9 +69,9 @@ $ ： 指向当前Assets文件夹
 @alias 结果变量
 @cond op {'exist_file'}
 
-@option op_encoding {'utf-8','utf8','ascii','base64','base64url','binary','hex','latin1','ucs-2','ucs2','utf16le'}
-@alias 文件编码 {utf-8,utf8,ascii,base64,base64url,binary,hex,latin1,ucs-2,ucs2,utf16le}
-@default utf-8
+@option op_encoding {'gbk','utf-8','utf8','ascii','base64','base64url','binary','hex','latin1','ucs-2','ucs2','utf16le'}
+@alias 文件编码 {gbk,utf-8,utf8,ascii,base64,base64url,binary,hex,latin1,ucs-2,ucs2,utf16le}
+@default gbk
 @cond op {'read_file','write_file'}
 
 */
@@ -98,8 +98,8 @@ class File_xr {
   }
   static read(path, en) {
     try {
-      const str = fs.readFileSync(path, { encoding: en });
-      return String(str)
+      const str = fs.readFileSync(path);
+      return iconv.decode(str, en)
     } catch {
       return null
     }
@@ -182,11 +182,11 @@ export default class Plugin {
   call() {
     switch (this.op) {
       case "read_file":
-        var data = File_xr.read(File_xr.compiltePath(this.file_path),this.op_encoding)
+        var data = File_xr.read(File_xr.compiltePath(this.file_path), this.op_encoding)
         Event.attributes[this.save_var] = this.op_path_type == "txt" ? data : File_xr.is_json(data) ? JSON.parse(data) : data
         break
       case "write_file":
-        let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false, this.is_append ? true : false,this.op_encoding)
+        let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false, this.is_append ? true : false, this.op_encoding)
         Event.attributes[this.save_res_var] = res
         break
       case "exist_file":

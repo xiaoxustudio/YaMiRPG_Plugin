@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-10 11:35:51
+ * @LastEditTime: 2023-10-11 12:31:31
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -38,6 +38,7 @@
 空对象：创建一个空的对象
 变量对象：将变量中的JSON对象复制过来
 填充对象：使用输入的键值作为对象
+字符串JSON：将JSON字符串转换为JSON对象
 
 @string key_list_f
 @alias 键列表

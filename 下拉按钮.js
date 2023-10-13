@@ -1,4 +1,11 @@
 /*
+ * @Author: xuranXYS
+ * @LastEditTime: 2023-10-13 19:09:47
+ * @GitHub: www.github.com/xiaoxustudio
+ * @WebSite: www.xiaoxustudio.top
+ * @Description: By xuranXYS
+ */
+/*
 @plugin 下拉按钮
 @version 1.0
 @author 徐然
@@ -18,13 +25,11 @@
 */
 
 export default class optionButton_UI_xr {
-  is_show
   ui
   constructor(ui) {
     if (ui instanceof ButtonElement) {
       this.ui = ui
     }
-    this.is_show = false
   }
  
   onStart() {

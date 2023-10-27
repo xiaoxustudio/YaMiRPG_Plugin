@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-25 18:41:58
+ * @LastEditTime: 2023-10-27 20:51:50
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -104,11 +104,19 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 @filter event
 @alias 遍历事件
 @cond base_op {"check"}
-@desc 内置变量：@result -> 任务对象 , @index -> 任务索引
+@desc 内置变量：
+1.@result -> 任务对象
+2.@index -> 任务索引
 
 @boolean inherit_check
 @alias 继承变量
 @default false
+@cond base_op {"check"}
+
+@boolean is_reverse
+@alias 倒叙遍历
+@default false
+@desc 从后往前遍历任务
 @cond base_op {"check"}
 
 @boolean is_index
@@ -433,19 +441,35 @@ export default class rw_xr {
             break
           case "check":
             // 查找任务，如果为查找到任务则报错
-            this.data.map((data, ind) => {
-              const commands = EventManager.guidMap[this.event_check]
-              if (commands) {
-                const event = new EventHandler(commands)
-                // 继承变量
-                if (this.inherit_check) {
-                  event.inheritEventContext(Event)
+            if (this.is_reverse) {
+              for (let i = this.data.length - 1; i >= 0; i--) {
+                const commands = EventManager.guidMap[this.event_check]
+                if (commands) {
+                  const event = new EventHandler(commands)
+                  // 继承变量
+                  if (this.inherit_check) {
+                    event.inheritEventContext(Event)
+                  }
+                  event.attributes["@index"] = i
+                  event.attributes["@result"] = this.data[i]
+                  EventHandler.call(event)
                 }
-                event.attributes["@index"] = ind
-                event.attributes["@result"] = data
-                EventHandler.call(event)
               }
-            })
+            } else {
+              this.data.map((data, ind) => {
+                const commands = EventManager.guidMap[this.event_check]
+                if (commands) {
+                  const event = new EventHandler(commands)
+                  // 继承变量
+                  if (this.inherit_check) {
+                    event.inheritEventContext(Event)
+                  }
+                  event.attributes["@index"] = ind
+                  event.attributes["@result"] = data
+                  EventHandler.call(event)
+                }
+              })
+            }
             break
         }
         break

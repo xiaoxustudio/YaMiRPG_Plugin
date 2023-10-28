@@ -354,6 +354,7 @@ export default class rw_xr {
           current: this.current_rw,
           config: this.config,
           data: this.data,
+          connect: this.connect
         }
         const dataText = JSON.stringify(struct, null, 2)
         const fsp = require('fs').promises
@@ -370,7 +371,8 @@ export default class rw_xr {
         let struct = {
           current: this.current_rw,
           config: this.config,
-          data: this.data
+          data: this.data,
+          connect: this.connect
         }
         return Promise.all([
           IDB.setItem(dataKey, struct),
@@ -396,6 +398,7 @@ export default class rw_xr {
           this.current_rw = res.current
           this.data = res.data
           this.config = res.config
+          this.connect = res.connect
         } catch (error) {
           console.warn(error)
           return
@@ -407,6 +410,7 @@ export default class rw_xr {
         this.current_rw = res.current
         this.data = res.data
         this.config = res.config
+        this.connect = res.connect
         break
       }
     }

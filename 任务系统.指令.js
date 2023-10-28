@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-27 20:51:50
+ * @LastEditTime: 2023-10-28 17:36:16
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -17,7 +17,7 @@
 
 任务标识如果为0，则不会添加任务（除非开启是索引选项）
 
-任务物品列表类型标识：
+任务物品列表类型标识：（未知类型将不会被添加）
 item（物品）,actor（角色）,skill（技能）,equip（装备）,state（状态）
 
 使用方法：
@@ -28,6 +28,12 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 获取任务键指令如果获取多个键，则会返回列表（可用遍历指令进行遍历）
 
 任务遍历用于遍历任务
+
+任务物品列表遍历会遍历任务的item属性
+
+任务是否可以完成会检查item里面的物品是否存在库存里面
+
+切换到下一个任务：会切换到链接相对于的任务
 
 @option op {"base","advanced","other"}
 @alias 操作 {基础操作,高级操作,其他操作}
@@ -41,9 +47,17 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 @default 0
 @cond other_op {"read","save","remove"}
 
-@option advanced_op {"get","set","add_e"}
-@alias 子操作 {获取任务键,设置任务键,添加额外任务结构}
+@option advanced_op {"get","set","add_con","dis_con","add_e"}
+@alias 子操作 {获取任务键,设置任务键,链接任务,断开链接,添加额外任务结构}
 @cond op {"advanced"}
+
+@string con_tag
+@alias 任务标识
+@cond advanced_op {"add_con","dis_con"}
+
+@string con_to_tag
+@alias 链接到(任务标识)
+@cond advanced_op {"add_con"}
 
 
 @string ad_get
@@ -58,6 +72,11 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 @alias 任务值表达式
 @cond advanced_op {"set"}
 
+@boolean not_string
+@alias 不是字符串
+@desc 设置之后将会将值解析为js值
+@cond advanced_op {"set"}
+
 @string[] rw_struct
 @alias 额外任务数据结构
 @desc 这里用于添加额外的数据结构
@@ -70,13 +89,13 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 @alias 保存到本地变量
 @cond advanced_op {"get"}
 
-@option base_op {"add","remove","get","check"}
-@alias 子操作 {添加任务,删除任务,获取任务,任务遍历}
+@option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","is_complete"}
+@alias 子操作 {添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,任务是否可以完成}
 @cond op {"base"}
 
 @string tag_rw
 @alias 任务标识
-@cond base_op {"add","get"}
+@cond base_op {"add","get","is_complete","check_list","set_default"}
 
 @string title_rw
 @alias 任务标题
@@ -103,15 +122,15 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 @file event_check
 @filter event
 @alias 遍历事件
-@cond base_op {"check"}
+@cond base_op {"check","check_list"}
 @desc 内置变量：
-1.@result -> 任务对象
-2.@index -> 任务索引
+1.@result -> 对象
+2.@index -> 索引
 
 @boolean inherit_check
 @alias 继承变量
 @default false
-@cond base_op {"check"}
+@cond base_op {"check","check_list"}
 
 @boolean is_reverse
 @alias 倒叙遍历
@@ -126,7 +145,7 @@ item（物品）,actor（角色）,skill（技能）,equip（装备）,state（�
 
 @string save_var
 @alias 保存到本地变量
-@cond base_op {"get"}
+@cond base_op {"get","is_complete","get_default"}
 
 */
 class xr {
@@ -279,7 +298,6 @@ class xr {
   }
 }
 
-
 /**
  * @description: 设置对象嵌套值
  * @param {*} a 
@@ -305,8 +323,10 @@ export default class rw_xr {
   _data // 数据
   current_rw
   config
+  connect
   constructor() {
     this.data = []
+    this.connect = {}
     this.current_rw = 0 // 当前任务
     this.config = {}
   }
@@ -439,6 +459,18 @@ export default class rw_xr {
               Event.attributes[this.save_var] = undefined
             }
             break
+          case "set_default":
+            this.current_rw = xr.compileVar(this.tag_rw)
+            break
+          case "get_default":
+            Event.attributes[this.save_var] = this.get_current()
+            break
+          case "change_next":
+            let next = this.get_connect(this.current_rw)
+            if (next != -1 && next) {
+              this.current_rw = next
+            }
+            break
           case "check":
             // 查找任务，如果为查找到任务则报错
             if (this.is_reverse) {
@@ -470,6 +502,53 @@ export default class rw_xr {
                 }
               })
             }
+            break
+          case "check_list":
+            let tag = xr.compileVar(this.tag_rw)
+            let task = this.get_task(tag)
+            if (task != -1 && task) {
+              for (let i in task["item"]) {
+                const commands = EventManager.guidMap[this.event_check]
+                if (commands) {
+                  const event = new EventHandler(commands)
+                  // 继承变量
+                  if (this.inherit_check) {
+                    event.inheritEventContext(Event)
+                  }
+                  event.attributes["@index"] = i
+                  let d_data = task["item"][i]
+                  let data_now;
+                  switch (d_data.type) {
+                    case 'actor': {
+                      data_now = new Actor(Data.actors[d_data.id])
+                      break
+                    }
+                    case 'skill': {
+                      data_now = new Skill(Data.skills[d_data.id])
+                      break
+                    }
+                    case 'state': {
+                      data_now = new State(Data.states[d_data.id])
+                      break
+                    }
+                    case 'equip': {
+                      data_now = new Equipment(Data.equipments[d_data.id])
+                      break
+                    }
+                    case 'item': {
+                      data_now = new Item(Data.items[d_data.id])
+                      data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                      break
+                    }
+                  }
+                  event.attributes["@result"] = data_now
+                  EventHandler.call(event)
+                }
+              }
+            }
+            break
+          case "is_complete":
+            Event.attributes[this.save_var] = this.can_complete(xr.compileVar(this.tag_rw))
             break
         }
         break
@@ -508,9 +587,16 @@ export default class rw_xr {
               if (str_split.length > 1) {
                 setNestedProperty(String(this.ad_exp), String(this.ad_exp_val), Event.attributes[ad_data])
               } else {
-                Event.attributes[ad_data][this.ad_exp] = xr.compileVar(this.ad_exp_val)
+                let val = xr.compileVar(this.ad_exp_val)
+                Event.attributes[ad_data][this.ad_exp] = this.not_string ? new Function("return " + val)() : val
               }
             }
+            break
+          case "add_con":
+            this.connect[xr.compileVar(this.con_tag)] = xr.compileVar(this.con_to_tag)
+            break
+          case "dis_con":
+            delete this.connect[xr.compileVar(this.con_tag)]
             break
         }
         break
@@ -543,10 +629,18 @@ export default class rw_xr {
     for (let i = 0; i < this.rw_struct.length; i++) {
       ex_data[this.rw_struct[i]] = undefined
     }
+    // 解析任务物品
+    let map_to = [
+      "item", "actor", "skill", "equip", "state"
+    ]
     let item_jx = []
+    let reg_num = /^[0-9]+.?[0-9]*/
     for (let i in item) {
       let str_splice = String(item[i]).trim().split(",")
-      item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), num: String(str_splice[2]).trim() })
+      // 不是有效任务物品将不会被添加
+      if (map_to.includes(String(str_splice[0]).trim()) && reg_num.test(String(str_splice[2]).trim())) {
+        item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), num: parseFloat(String(str_splice[2]).trim()) })
+      }
     }
     if (tag !== -1) {
       this.data.push({ title, desc, tag, state, item: item_jx, ...ex_data })
@@ -597,6 +691,73 @@ export default class rw_xr {
       return this.data[data]
     }
     return undefined
+  }
+
+  /**
+   * @description: 判断指定任务是否可以完成
+   * @param {*} tag
+   * @return {*}
+   */
+  can_complete(tag) {
+    let task_data = this.get_task(tag)
+    if (task_data != -1 && task_data) {
+      let items = task_data["item"]
+      let duibi = Array(items.length).fill(true)
+      let now_duibi = []
+      // 缓存
+      let _cacheMap = {}
+      for (let i in items) {
+        let item = items[i]
+        let aci = Party.player?.inventory
+        // 如果是物品
+        if (item.type == "item") {
+          // 判断id是否存在，存在就在里面取数量
+          if (_cacheMap.hasOwnProperty(item.id)) {
+            if (item.id == aci.get(item.id).id && _cacheMap[item.id] >= parseFloat(item.num)) {
+              _cacheMap[item.id] = _cacheMap[item.id] - parseFloat(item.num)
+              now_duibi.push(true)
+              continue
+            }
+          } else {
+            if (item.id == aci.get(item.id).id && aci.count(item.id) >= parseFloat(item.num)) {
+              _cacheMap[item.id] = aci.count(item.id) - parseFloat(item.num)
+              now_duibi.push(true)
+              continue
+            }
+          }
+        } else if (item.type == "equip") {
+          let eq_obj = aci.get(item.id) instanceof Equipment ? aci.get(item.id) : undefined
+          if (item.id == eq_obj?.id) {
+            now_duibi.push(true)
+            continue
+          }
+        }
+        now_duibi.push(false)
+      }
+      if (duibi.length === now_duibi.length && duibi.every((v, i) => v === now_duibi[i])) {
+        return true
+      } else {
+        return false
+      }
+    }
+    return false
+  }
+
+  /**
+   * @description: 获取当前任务
+   * @return {*}
+   */
+  get_current() {
+    let rw = this.get_task(this.current_rw)
+    return rw
+  }
+  /**
+   * @description: 获取对应链接关系
+   * @param {*} tag 标识
+   * @return {*}
+   */
+  get_connect(tag) {
+    return this.connect[tag] ? this.connect[tag] : -1
   }
 }
 

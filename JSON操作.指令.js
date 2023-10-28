@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-11 12:31:31
+ * @LastEditTime: 2023-10-28 11:50:46
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -28,8 +28,8 @@
 键列表和值列表可使用<local|global:var_name>
 
 
-@option op {"create_json","add_key_val","rm_key","is_key","map_json","change_str_json"}
-@alias 操作 {创建JSON,设置键值,移除键,键是否存在,遍历键值,转换为JSON字符串}
+@option op {"create_json","get_key_val","add_key_val","rm_key","is_key","map_json","change_str_json"}
+@alias 操作 {创建JSON,获取键,设置键值,移除键,键是否存在,遍历键值,转换为JSON字符串}
 
 @option create_sub {"null_obj","var_obj","fill_obj","str_json"}
 @alias 类型 {空对象,变量对象,填充对象,字符串JSON}
@@ -65,11 +65,11 @@
 @alias 目标变量
 @default "json_obj"
 @desc 设置要操作的目标对象
-@cond op {"add_key_val","is_key","map_json","change_str_json"}
+@cond op {"add_key_val","is_key","map_json","change_str_json","get_key_val"}
 
 @string key_list
 @alias 键列表
-@cond op {"add_key_val","rm_key","is_key"}
+@cond op {"add_key_val","rm_key","is_key","get_key_val"}
 @desc key列表（多个用逗号分割）
 
 @string val_list
@@ -82,7 +82,7 @@
 @alias 存储变量
 @default "json_obj"
 @desc 操作结果存储到本地变量
-@cond op {"create_json","is_key","change_str_json"}
+@cond op {"create_json","is_key","change_str_json","get_key_val"}
 
 @file event_map
 @filter event
@@ -263,6 +263,26 @@ export default class JSON_xr {
             }
             break
         }
+        break
+      case "get_key_val":
+        var key = xr.compileVar(String(this.key_list)).split(",")
+        key.map((val, index) => {
+          key[index] = val.trim()
+        })
+        if (key.length > 1) {
+          let arr = []
+          for (let i = 0; i < key.length; i++) {
+            if (xr.is_obj(Event.attributes[String(this.set_var)])) {
+              arr.push(Event.attributes[String(this.set_var)][xr.compileVar(val[String(i)])])
+            }
+          }
+          Event.attributes[String(this.save_var)] = arr
+        } else {
+          if (xr.is_obj(Event.attributes[String(this.set_var)])) {
+            Event.attributes[String(this.save_var)] = Event.attributes[String(this.set_var)][key[0]]
+          }
+        }
+        key = undefined
         break
       case "add_key_val":
         var key = xr.compileVar(String(this.key_list)).split(",")

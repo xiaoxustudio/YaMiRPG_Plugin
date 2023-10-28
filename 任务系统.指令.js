@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-28 17:36:16
+ * @LastEditTime: 2023-10-28 21:43:12
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -18,18 +18,25 @@
 任务标识如果为0，则不会添加任务（除非开启是索引选项）
 
 任务物品列表类型标识：（未知类型将不会被添加）
-item（物品）,actor（角色）,skill（技能）,equip（装备）,state（状态）
+已添加（可使用类型）：item（物品）,actor（角色）, equip（装备），var（全局变量）
+未添加（不可用但后期会添加）：skill（技能）,state（状态）
 
 使用方法：
-类型，id，数量
+item（物品）,actor（角色）, equip（装备）：类型，id，数量
+var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
 
 可对任务数据结构添加额外的属性
 
 获取任务键指令如果获取多个键，则会返回列表（可用遍历指令进行遍历）
 
-任务遍历用于遍历任务
+任务遍历用于遍历任务:
+1.@index -> 索引
+2.@result -> 物品转换数据
 
-任务物品列表遍历会遍历任务的item属性
+任务物品列表遍历会遍历任务的item属性：
+1.@index -> 索引
+2.@result -> 物品转换数据
+3.@result_rw -> 物品原始数据
 
 任务是否可以完成会检查item里面的物品是否存在库存里面
 
@@ -525,6 +532,7 @@ export default class rw_xr {
                   switch (d_data.type) {
                     case 'actor': {
                       data_now = new Actor(Data.actors[d_data.id])
+                      data_now.talk = d_data.talk ? d_data.talk : false
                       break
                     }
                     case 'skill': {
@@ -544,8 +552,16 @@ export default class rw_xr {
                       data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
                       break
                     }
+                    case 'var': {
+                      // 变量计算
+                      let v_data = Variable.get(d_data.id)
+                      let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
+                      data_now = { ...d_data, calc: new Function(eval_str)() }
+                      break
+                    }
                   }
                   event.attributes["@result"] = data_now
+                  event.attributes["@result1_rw"] = d_data
                   EventHandler.call(event)
                 }
               }
@@ -635,15 +651,37 @@ export default class rw_xr {
     }
     // 解析任务物品
     let map_to = [
-      "item", "actor", "skill", "equip", "state"
+      "item", "actor", "skill", "equip", "state", "var"
     ]
     let item_jx = []
     let reg_num = /^[0-9]+.?[0-9]*/
+    let item_ex
     for (let i in item) {
       let str_splice = String(item[i]).trim().split(",")
+      item_ex = {
+        item: { num: parseFloat(String(str_splice[2]).trim()) },
+        equip: { num: parseFloat(String(str_splice[2]).trim()) },
+        actor: { talk: false },
+        var: { op: String(str_splice[2]).trim(), val: String(str_splice[3]).trim(), name: str_splice[4]?.trim() }
+      }
       // 不是有效任务物品将不会被添加
-      if (map_to.includes(String(str_splice[0]).trim()) && reg_num.test(String(str_splice[2]).trim())) {
-        item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), num: parseFloat(String(str_splice[2]).trim()) })
+      if (map_to.includes(String(str_splice[0]).trim())) {
+        // 检测物品和装备任务是否有效
+        if (String(str_splice[0]).trim() == "item" || String(str_splice[0]).trim() == "equip") {
+          if (!reg_num.test(String(str_splice[2]).trim())) {
+            continue
+          }
+        }
+        // 检测变量任务是否有效
+        if (String(str_splice[0]).trim() == "var") {
+          if (!item_ex[str_splice[0]].op || !item_ex[str_splice[0]].val) {
+            continue
+          }
+          if (!item_ex[str_splice[0]].name) {
+            item_ex[str_splice[0]].name = "全局变量" + str_splice[1]
+          }
+        }
+        item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex[String(str_splice[0]).trim()] })
       }
     }
     if (tag !== -1) {
@@ -676,9 +714,10 @@ export default class rw_xr {
       this.data.map((data, ind) => {
         if (data.tag == tag) {
           delete data[tag]
-          return f_index
+          return true
         }
       })
+      return false
     }
   }
   /**
@@ -732,6 +771,19 @@ export default class rw_xr {
         } else if (item.type == "equip") {
           let eq_obj = aci.get(item.id) instanceof Equipment ? aci.get(item.id) : undefined
           if (item.id == eq_obj?.id) {
+            now_duibi.push(true)
+            continue
+          }
+        } else if (item.type == "actor") {
+          if (item?.talk) {
+            now_duibi.push(true)
+            continue
+          }
+        } else if (item.type == "var") {
+          // 变量计算
+          let v_data = Variable.get(item.id)
+          let eval_str = "return " + v_data + " " + item.op + " " + item.val + " ? true : false"
+          if (new Function(eval_str)()) {
             now_duibi.push(true)
             continue
           }

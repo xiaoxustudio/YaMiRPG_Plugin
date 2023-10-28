@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-28 21:43:12
+ * @LastEditTime: 2023-10-29 00:47:15
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -53,6 +53,7 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @alias 存档索引
 @default 0
 @cond other_op {"read","save","remove"}
+@desc 用于操作任务数据的索引
 
 @option advanced_op {"get","set","add_con","dis_con","add_e"}
 @alias 子操作 {获取任务键,设置任务键,链接任务,断开链接,添加额外任务结构}
@@ -61,23 +62,27 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @string con_tag
 @alias 任务标识
 @cond advanced_op {"add_con","dis_con"}
+@desc 用来标识一个任务的标识
 
 @string con_to_tag
 @alias 链接到(任务标识)
 @cond advanced_op {"add_con"}
-
+@desc 被链接的任务标识
 
 @string ad_get
 @alias 任务对象变量
 @cond advanced_op {"get","set"}
+@desc 传入一个任务对象
 
 @string ad_exp
 @alias 任务键表达式
 @cond advanced_op {"get","set"}
+@desc 任务键表达式（多个用英文逗号分割）
 
 @string ad_exp_val
 @alias 任务值表达式
 @cond advanced_op {"set"}
+@desc 任务值表达式（多个用英文逗号分割）
 
 @boolean not_string
 @alias 不是字符串
@@ -86,50 +91,66 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 
 @string[] rw_struct
 @alias 额外任务数据结构
-@desc 这里用于添加额外的数据结构
+@desc 这里用于添加额外的任务数据结构
 @cond advanced_op {"add_e"}
-
-
 
 
 @string ad_save_var
 @alias 保存到本地变量
 @cond advanced_op {"get"}
+@desc 将操作的结果保存到变量
 
-@option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","is_complete"}
-@alias 子操作 {添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,任务是否可以完成}
+@option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","check_list_com","is_complete"}
+@alias 子操作 {添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,完成任务物品列表遍历,任务是否可以完成}
 @cond op {"base"}
 
 @string tag_rw
 @alias 任务标识
-@cond base_op {"add","get","is_complete","check_list","set_default"}
+@cond base_op {"add","get","is_complete","check_list","set_default","check_list_com"}
+@desc 用来标识一个任务的标识
 
 @string title_rw
 @alias 任务标题
 @cond base_op {"add"}
+@desc 任务的标题
 
 @number type_rw
 @alias 任务类型
 @default 0
 @cond base_op {"add"}
+@desc 任务的类型，目前无作用，可自行扩展
 
 @string desc_rw
 @alias 任务描述
 @cond base_op {"add"}
+@desc 任务的描述信息
 
 @string[] item_list_str
 @alias 开启物品列表
 @cond base_op {"add"}
+@desc 任务的表达式物品列表（用于检测任务）
+使用方法：
+item（物品）,actor（角色）, equip（装备）：类型，id，数量
+var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
+
+@string[] item_list_com
+@alias 完成物品列表
+@cond base_op {"add"}
+@desc 任务的表达式物品列表（用于完成任务后）
+使用方法：
+item（物品）,actor（角色）, equip（装备）：类型，id，数量
+var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
+
 
 @string remove_rw
 @alias 移除任务标识
 @cond base_op {"remove"}
-
+@desc 移除填写的对应的任务
 
 @file event_check
 @filter event
 @alias 遍历事件
-@cond base_op {"check","check_list"}
+@cond base_op {"check","check_list","check_list_com"}
 @desc 内置变量：
 1.@result -> 对象
 2.@index -> 索引
@@ -137,7 +158,8 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @boolean inherit_check
 @alias 继承变量
 @default false
-@cond base_op {"check","check_list"}
+@cond base_op {"check","check_list","check_list_com"}
+@desc 继承当前的本地变量
 
 @boolean is_reverse
 @alias 倒叙遍历
@@ -149,11 +171,12 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @default false
 @alias 是索引
 @cond base_op {"get"}
+@desc 通过索引获取任务，索引为数值
 
 @string save_var
 @alias 保存到本地变量
 @cond base_op {"get","is_complete","get_default"}
-
+@desc 将操作的结果保存到变量
 */
 class xr {
   static is_obj(obj) {
@@ -451,13 +474,19 @@ export default class rw_xr {
       case "base":
         switch (this.base_op) {
           case "add":
-            this.add_task({
-              title: xr.compileVar(this.title_rw),
-              type: this.type_rw,
-              desc: xr.compileVar(this.desc_rw),
-              tag: xr.compileVar(this.tag_rw),
-              item: xr.compileVar(this.item_list_str),
-            })
+            try {
+              this.add_task({
+                title: xr.compileVar(this.title_rw),
+                type: this.type_rw,
+                desc: xr.compileVar(this.desc_rw),
+                tag: xr.compileVar(this.tag_rw),
+                item: this.item_list_str,
+                c_item: this.item_list_com
+              })
+            } catch (e) {
+              console.log("添加任务错误", e.message)
+              throw e
+            }
             break
           case "remove":
             this.remove_task(xr.compileVar(this.remove_rw))
@@ -483,88 +512,156 @@ export default class rw_xr {
             }
             break
           case "check":
-            // 查找任务，如果为查找到任务则报错
-            if (this.is_reverse) {
-              for (let i = this.data.length - 1; i >= 0; i--) {
-                const commands = EventManager.guidMap[this.event_check]
-                if (commands) {
-                  const event = new EventHandler(commands)
-                  // 继承变量
-                  if (this.inherit_check) {
-                    event.inheritEventContext(Event)
+            try {
+              // 查找任务，如果为查找到任务则报错
+              if (this.is_reverse) {
+                for (let i = this.data.length - 1; i >= 0; i--) {
+                  const commands = EventManager.guidMap[this.event_check]
+                  if (commands) {
+                    const event = new EventHandler(commands)
+                    // 继承变量
+                    if (this.inherit_check) {
+                      event.inheritEventContext(Event)
+                    }
+                    event.attributes["@index"] = i
+                    event.attributes["@result"] = this.data[i]
+                    EventHandler.call(event)
                   }
-                  event.attributes["@index"] = i
-                  event.attributes["@result"] = this.data[i]
-                  EventHandler.call(event)
                 }
+              } else {
+                this.data.map((data, ind) => {
+                  const commands = EventManager.guidMap[this.event_check]
+                  if (commands) {
+                    const event = new EventHandler(commands)
+                    // 继承变量
+                    if (this.inherit_check) {
+                      event.inheritEventContext(Event)
+                    }
+                    event.attributes["@index"] = ind
+                    event.attributes["@result"] = data
+                    EventHandler.call(event)
+                  }
+                })
               }
-            } else {
-              this.data.map((data, ind) => {
-                const commands = EventManager.guidMap[this.event_check]
-                if (commands) {
-                  const event = new EventHandler(commands)
-                  // 继承变量
-                  if (this.inherit_check) {
-                    event.inheritEventContext(Event)
-                  }
-                  event.attributes["@index"] = ind
-                  event.attributes["@result"] = data
-                  EventHandler.call(event)
-                }
-              })
+            } catch (e) {
+              console.log("任务遍历错误", e.message)
+              throw e
             }
             break
           case "check_list":
-            let tag = xr.compileVar(this.tag_rw)
-            let task = this.get_task(tag)
-            if (task != -1 && task) {
-              for (let i in task["item"]) {
-                const commands = EventManager.guidMap[this.event_check]
-                if (commands) {
-                  const event = new EventHandler(commands)
-                  // 继承变量
-                  if (this.inherit_check) {
-                    event.inheritEventContext(Event)
+            try {
+              let tag = xr.compileVar(this.tag_rw)
+              let task = this.get_task(tag)
+              if (task != -1 && task) {
+                for (let i in task["item"]) {
+                  const commands = EventManager.guidMap[this.event_check]
+                  if (commands) {
+                    const event = new EventHandler(commands)
+                    // 继承变量
+                    if (this.inherit_check) {
+                      event.inheritEventContext(Event)
+                    }
+                    event.attributes["@index"] = i
+                    let d_data = task["item"][i]
+                    let data_now;
+                    switch (d_data.type) {
+                      case 'actor': {
+                        data_now = new Actor(Data.actors[d_data.id])
+                        data_now.talk = d_data.talk ? d_data.talk : false
+                        break
+                      }
+                      case 'skill': {
+                        data_now = new Skill(Data.skills[d_data.id])
+                        break
+                      }
+                      case 'state': {
+                        data_now = new State(Data.states[d_data.id])
+                        break
+                      }
+                      case 'equip': {
+                        data_now = new Equipment(Data.equipments[d_data.id])
+                        break
+                      }
+                      case 'item': {
+                        data_now = new Item(Data.items[d_data.id])
+                        data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                        break
+                      }
+                      case 'var': {
+                        // 变量计算
+                        let v_data = Variable.get(d_data.id)
+                        let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
+                        data_now = { ...d_data, calc: new Function(eval_str)() }
+                        break
+                      }
+                    }
+                    event.attributes["@result"] = data_now
+                    event.attributes["@result1_rw"] = d_data
+                    EventHandler.call(event)
                   }
-                  event.attributes["@index"] = i
-                  let d_data = task["item"][i]
-                  let data_now;
-                  switch (d_data.type) {
-                    case 'actor': {
-                      data_now = new Actor(Data.actors[d_data.id])
-                      data_now.talk = d_data.talk ? d_data.talk : false
-                      break
-                    }
-                    case 'skill': {
-                      data_now = new Skill(Data.skills[d_data.id])
-                      break
-                    }
-                    case 'state': {
-                      data_now = new State(Data.states[d_data.id])
-                      break
-                    }
-                    case 'equip': {
-                      data_now = new Equipment(Data.equipments[d_data.id])
-                      break
-                    }
-                    case 'item': {
-                      data_now = new Item(Data.items[d_data.id])
-                      data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
-                      break
-                    }
-                    case 'var': {
-                      // 变量计算
-                      let v_data = Variable.get(d_data.id)
-                      let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
-                      data_now = { ...d_data, calc: new Function(eval_str)() }
-                      break
-                    }
-                  }
-                  event.attributes["@result"] = data_now
-                  event.attributes["@result1_rw"] = d_data
-                  EventHandler.call(event)
                 }
               }
+            } catch (e) {
+              console.log("任务物品列表错误", e.message)
+              throw e
+            }
+            break
+          case "check_list_com":
+            try {
+              let tag = xr.compileVar(this.tag_rw)
+              let task = this.get_task(tag)
+              if (task != -1 && task) {
+                for (let i in task["complete_item"]) {
+                  const commands = EventManager.guidMap[this.event_check]
+                  if (commands) {
+                    const event = new EventHandler(commands)
+                    // 继承变量
+                    if (this.inherit_check) {
+                      event.inheritEventContext(Event)
+                    }
+                    event.attributes["@index"] = i
+                    let d_data = task["complete_item"][i]
+                    let data_now;
+                    switch (d_data.type) {
+                      case 'actor': {
+                        data_now = new Actor(Data.actors[d_data.id])
+                        data_now.talk = d_data.talk ? d_data.talk : false
+                        break
+                      }
+                      case 'skill': {
+                        data_now = new Skill(Data.skills[d_data.id])
+                        break
+                      }
+                      case 'state': {
+                        data_now = new State(Data.states[d_data.id])
+                        break
+                      }
+                      case 'equip': {
+                        data_now = new Equipment(Data.equipments[d_data.id])
+                        break
+                      }
+                      case 'item': {
+                        data_now = new Item(Data.items[d_data.id])
+                        data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                        break
+                      }
+                      case 'var': {
+                        // 变量计算
+                        let v_data = Variable.get(d_data.id)
+                        let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
+                        data_now = { ...d_data, calc: new Function(eval_str)() }
+                        break
+                      }
+                    }
+                    event.attributes["@result"] = data_now
+                    event.attributes["@result1_rw"] = d_data
+                    EventHandler.call(event)
+                  }
+                }
+              }
+            } catch (e) {
+              console.log("任务物品列表错误", e.message)
+              throw e
             }
             break
           case "is_complete":
@@ -572,44 +669,55 @@ export default class rw_xr {
             break
         }
         break
+
       case "advanced":
         switch (this.advanced_op) {
           case "get":
-            var ad_data = xr.compileVar(this.ad_get)
-            if (ad_data) {
-              let str_split = String(this.ad_exp).trim().split(",")
-              if (str_split.length > 1) {
-                let is_obj_self = false
-                // 自己是否是对象，是的话从自身获取
-                if (typeof ad_data == "object") {
-                  is_obj_self = true
+            try {
+              var ad_data = xr.compileVar(this.ad_get)
+              if (ad_data) {
+                let str_split = String(this.ad_exp).trim().split(",")
+                if (str_split.length > 1) {
+                  let is_obj_self = false
+                  // 自己是否是对象，是的话从自身获取
+                  if (typeof ad_data == "object") {
+                    is_obj_self = true
+                  }
+                  // 填充数字键
+                  let save_arr = {}
+                  for (let j = 0; j < str_split.length; j++) {
+                    save_arr[String(j)] = is_obj_self ? (ad_data?.[str_split?.[j]]) : (Event.attributes[ad_data]?.[str_split?.[j]])
+                  }
+                  Event.attributes[this.ad_save_var] = save_arr
+                } else {
+                  let is_obj_self = false
+                  // 自己是否是对象，是的话从自身获取
+                  if (typeof ad_data == "object") {
+                    is_obj_self = true
+                  }
+                  Event.attributes[this.ad_save_var] = is_obj_self ? ad_data[this.ad_exp] : (Event.attributes[ad_data][this.ad_exp])
                 }
-                // 填充数字键
-                let save_arr = {}
-                for (let j = 0; j < str_split.length; j++) {
-                  save_arr[String(j)] = is_obj_self ? (ad_data?.[str_split?.[j]]) : (Event.attributes[ad_data]?.[str_split?.[j]])
-                }
-                Event.attributes[this.ad_save_var] = save_arr
-              } else {
-                let is_obj_self = false
-                // 自己是否是对象，是的话从自身获取
-                if (typeof ad_data == "object") {
-                  is_obj_self = true
-                }
-                Event.attributes[this.ad_save_var] = is_obj_self ? ad_data[this.ad_exp] : (Event.attributes[ad_data][this.ad_exp])
               }
+            } catch (e) {
+              console.log("获取键值错误", e.message)
+              throw e
             }
             break
           case "set":
-            var ad_data = xr.compileVar(this.ad_get)
-            if (ad_data) {
-              let str_split = String(this.ad_exp).trim().split(",")
-              if (str_split.length > 1) {
-                setNestedProperty(String(this.ad_exp), String(this.ad_exp_val), Event.attributes[ad_data])
-              } else {
-                let val = xr.compileVar(this.ad_exp_val)
-                Event.attributes[ad_data][this.ad_exp] = this.not_string ? new Function("return " + val)() : val
+            try {
+              var ad_data = xr.compileVar(this.ad_get)
+              if (ad_data) {
+                let str_split = String(this.ad_exp).trim().split(",")
+                if (str_split.length > 1) {
+                  setNestedProperty(String(this.ad_exp), String(this.ad_exp_val), Event.attributes[ad_data])
+                } else {
+                  let val = xr.compileVar(this.ad_exp_val)
+                  Event.attributes[ad_data][this.ad_exp] = this.not_string ? new Function("return " + val)() : val
+                }
               }
+            } catch (e) {
+              console.log("设置键值错误", e.message)
+              throw e
             }
             break
           case "add_con":
@@ -643,7 +751,7 @@ export default class rw_xr {
    * @param {*} tag
    * @return {*}
    */
-  add_task({ title, desc, item = [], state = false, tag = -1 }) {
+  add_task({ title, desc, item = [], c_item = [], state = false, tag = -1 }) {
     // 额外属性
     let ex_data = {}
     for (let i = 0; i < this.rw_struct.length; i++) {
@@ -653,6 +761,7 @@ export default class rw_xr {
     let map_to = [
       "item", "actor", "skill", "equip", "state", "var"
     ]
+    // 编译物品列表
     let item_jx = []
     let reg_num = /^[0-9]+.?[0-9]*/
     let item_ex
@@ -684,8 +793,39 @@ export default class rw_xr {
         item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex[String(str_splice[0]).trim()] })
       }
     }
+    // 编译完成物品列表
+    let complete_item = []
+    let item_ex1
+    for (let i in c_item) {
+      let str_splice = String(c_item[i]).trim().split(",")
+      item_ex1 = {
+        item: { num: parseFloat(String(str_splice[2]).trim()) },
+        equip: { num: parseFloat(String(str_splice[2]).trim()) },
+        actor: { talk: false },
+        var: { op: String(str_splice[2]).trim(), val: String(str_splice[3]).trim(), name: str_splice[4]?.trim() }
+      }
+      // 不是有效任务物品将不会被添加
+      if (map_to.includes(String(str_splice[0]).trim())) {
+        // 检测物品和装备任务是否有效
+        if (String(str_splice[0]).trim() == "item" || String(str_splice[0]).trim() == "equip") {
+          if (!reg_num.test(String(str_splice[2]).trim())) {
+            continue
+          }
+        }
+        // 检测变量任务是否有效
+        if (String(str_splice[0]).trim() == "var") {
+          if (!item_ex1[str_splice[0]].op || !item_ex1[str_splice[0]].val) {
+            continue
+          }
+          if (!item_ex1[str_splice[0]].name) {
+            item_ex1[str_splice[0]].name = "全局变量" + str_splice[1]
+          }
+        }
+        complete_item.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex1[String(str_splice[0]).trim()] })
+      }
+    }
     if (tag !== -1) {
-      this.data.push({ title, desc, tag, state, item: item_jx, ...ex_data })
+      this.data.push({ title, desc, tag, state, item: item_jx, complete_item, ...ex_data })
     }
   }
   /**

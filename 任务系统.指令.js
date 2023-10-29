@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-29 00:47:15
+ * @LastEditTime: 2023-10-29 11:57:46
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -9,7 +9,7 @@
 @plugin 任务系统
 @version 1.0
 @author 徐然
-@link 
+@link https://space.bilibili.com/291565199
 @desc 
 
 任务系统
@@ -18,14 +18,20 @@
 任务标识如果为0，则不会添加任务（除非开启是索引选项）
 
 任务物品列表类型标识：（未知类型将不会被添加）
-已添加（可使用类型）：item（物品）,actor（角色）, equip（装备），var（全局变量）
-未添加（不可用但后期会添加）：skill（技能）,state（状态）
+item（物品）, actor（角色）, equip（装备），skill（技能）,state（状态）
+var（全局变量）, event（事件）
 
 使用方法：
-item（物品）,actor（角色）, equip（装备）：类型，id，数量
-var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
+item（物品）,actor（角色）, equip（装备），var（全局变量），skill（技能）,state（状态）：
+类型，id，数量
 
-可对任务数据结构添加额外的属性
+var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
+event（事件）：类型，id，执行次数
+
+PS：事件类型会在遍历的时候自动执行，内置变量：@index ：循环索引
+
+
+添加额外任务结构指令可对任务数据结构添加额外的属性
 
 获取任务键指令如果获取多个键，则会返回列表（可用遍历指令进行遍历）
 
@@ -35,7 +41,12 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 
 任务物品列表遍历会遍历任务的item属性：
 1.@index -> 索引
-2.@result -> 物品转换数据
+2.@result -> 物品转换数据（通常是个对象）
+3.@result_rw -> 物品原始数据
+
+任务完成物品列表遍历会遍历任务的item属性：
+1.@index -> 索引
+2.@result -> 物品转换数据（通常是个对象）
 3.@result_rw -> 物品原始数据
 
 任务是否可以完成会检查item里面的物品是否存在库存里面
@@ -45,8 +56,8 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @option op {"base","advanced","other"}
 @alias 操作 {基础操作,高级操作,其他操作}
 
-@option other_op {"read","save","remove"}
-@alias 子操作 {读取任务数据,保存任务数据,删除任务数据}
+@option other_op {"read","save","remove","show"}
+@alias 子操作 {读取任务数据,保存任务数据,删除任务数据,插件信息显示}
 @cond op {"other"}
 
 @string rw_data_num
@@ -101,7 +112,7 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @desc 将操作的结果保存到变量
 
 @option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","check_list_com","is_complete"}
-@alias 子操作 {添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,完成任务物品列表遍历,任务是否可以完成}
+@alias 子操作 {添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,任务完成物品列表遍历,任务是否可以完成}
 @cond op {"base"}
 
 @string tag_rw
@@ -179,6 +190,22 @@ var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示�
 @desc 将操作的结果保存到变量
 */
 class xr {
+  static showInfo() {
+    console.log(
+      `   ____         __   __                      \n` +
+      `  |  _ \\        \\ \\ / /                      \n` +
+      `  | |_) |_   _   \\ V /_   _ _ __ __ _ _ __   \n` +
+      `  |  _ <| | | |   > <| | | | '__/ _\` | '_ \\  \n` +
+      `  | |_) | |_| |  / . \\ |_| | | | (_| | | | | \n` +
+      `  |____/ \\__, | /_/ \\_\\__,_|_|  \\__,_|_| |_| \n` +
+      `          __/ |                              \n` +
+      `         |___/                               \n` +
+      "\n\n  任务系统  \n\n" +
+      "🏠b站：https://space.bilibili.com/291565199\n\n" +
+      "📞github：https://github.com/xiaoxustudio\n\n" +
+      "🌒官网：www.xiaoxustudio.top\n\n"
+    )
+  }
   static is_obj(obj) {
     return typeof obj == "object"
   }
@@ -349,16 +376,69 @@ function setNestedProperty(a, b, obj) {
   return obj;
 }
 
+class Error_xr {
+  constructor(msg, event, e) {
+    let Map = {
+      'triggerActor': "name",
+      'casterActor': "name",
+      'triggerSkill': "name",
+      'triggerState': "name",
+      'triggerEquipment': "name",
+      'triggerItem': "name",
+      'triggerObject': "name",
+      'triggerLight': "name",
+      'triggerRegion': "name",
+      'triggerElement': "parent",
+    }
+    let str = "元素 Root"
+    let _obj
+    if (event.hasOwnProperty("triggerElement")) {
+      _obj = event["triggerElement"]
+      while (!(_obj["parent"] instanceof RootElement)) {
+        str += "/" + _obj["parent"].name
+        _obj = _obj["parent"]
+      }
+
+    } else if (event.hasOwnProperty("triggerActor")) {
+      let lex = "triggerActor"
+      str = "角色 " + event[lex].attributes[Map[lex]]
+    } else if (event.hasOwnProperty("triggerSkill")) {
+      let lex = "triggerSkill"
+      str = "技能 " + event[lex].attributes[Map[lex]]
+    } else if (event.hasOwnProperty("triggerState")) {
+      let lex = "triggerState"
+      str = "状态 " + event[lex].attributes[Map[lex]]
+    } else if (event.hasOwnProperty("triggerEquipment")) {
+      let lex = "triggerEquipment"
+      str = "装备 " + event[lex].attributes[Map[lex]]
+    } else if (event.hasOwnProperty("triggerItem")) {
+      let lex = "triggerItem"
+      str = "物品 " + event[lex].attributes[Map[lex]]
+    } else if (event.hasOwnProperty("triggerRegion")) {
+      let lex = "triggerRegion"
+      str = "区域 " + event[lex].attributes[Map[lex]]
+    } else if (event.hasOwnProperty("triggerLight")) {
+      let lex = "triggerLight"
+      str = "光源 " + event[lex].attributes[Map[lex]]
+    }
+    console.log(msg, "\n", str, "\n", event)
+    throw e
+  }
+}
+
+
 export default class rw_xr {
   _data // 数据
   current_rw
   config
   connect
+  is_close
   constructor() {
     this.data = []
     this.connect = {}
     this.current_rw = 0 // 当前任务
     this.config = {}
+    this.is_close = false // 默认不关闭作者信息显示
   }
   // 属性定义
   get data() {
@@ -484,8 +564,7 @@ export default class rw_xr {
                 c_item: this.item_list_com
               })
             } catch (e) {
-              console.log("添加任务错误", e.message)
-              throw e
+              new Error_xr("添加任务错误：", Event, e)
             }
             break
           case "remove":
@@ -544,8 +623,7 @@ export default class rw_xr {
                 })
               }
             } catch (e) {
-              console.log("任务遍历错误", e.message)
-              throw e
+              new Error_xr("任务遍历错误：", Event, e)
             }
             break
           case "check_list":
@@ -566,32 +644,72 @@ export default class rw_xr {
                     let data_now;
                     switch (d_data.type) {
                       case 'actor': {
-                        data_now = new Actor(Data.actors[d_data.id])
-                        data_now.talk = d_data.talk ? d_data.talk : false
+                        try {
+                          data_now = new Actor(Data.actors[d_data.id])
+                          data_now.talk = d_data.talk ? d_data.talk : false
+                        } catch (e) {
+                          new Error_xr("(解析)角色错误：", Event, e)
+                        }
                         break
                       }
                       case 'skill': {
-                        data_now = new Skill(Data.skills[d_data.id])
+                        try {
+                          data_now = new Skill(Data.skills[d_data.id])
+                        } catch (e) {
+                          new Error_xr("(解析)技能错误：", Event, e)
+                        }
                         break
                       }
                       case 'state': {
-                        data_now = new State(Data.states[d_data.id])
+                        try {
+                          data_now = new State(Data.states[d_data.id])
+                        } catch (e) {
+                          new Error_xr("(解析)状态错误：", Event, e)
+                        }
                         break
                       }
                       case 'equip': {
-                        data_now = new Equipment(Data.equipments[d_data.id])
+                        try {
+                          data_now = new Equipment(Data.equipments[d_data.id])
+                        } catch (e) {
+                          new Error_xr("(解析)装备错误：", Event, e)
+                        }
                         break
                       }
                       case 'item': {
-                        data_now = new Item(Data.items[d_data.id])
-                        data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                        try {
+                          data_now = new Item(Data.items[d_data.id])
+                          data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                        } catch (e) {
+                          new Error_xr("(解析)物品错误：", Event, e)
+                        }
                         break
                       }
                       case 'var': {
                         // 变量计算
-                        let v_data = Variable.get(d_data.id)
-                        let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
-                        data_now = { ...d_data, calc: new Function(eval_str)() }
+                        try {
+                          let v_data = Variable.get(d_data.id)
+                          let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
+                          data_now = { ...d_data, calc: new Function(eval_str)() }
+                        } catch (e) {
+                          new Error_xr("(解析)变量错误：", Event, e)
+                        }
+                        break
+                      }
+                      case 'event': {
+                        try {
+                          let num = parseFloat(d_data.num)
+                          const commands = EventManager.guidMap[d_data.id]
+                          if (commands) {
+                            for (let i = 0; i < num; i++) {
+                              const event = new EventHandler(commands)
+                              event.attributes["@index"] = i
+                              EventHandler.call(event)
+                            }
+                          }
+                        } catch (e) {
+                          new Error_xr("(解析)事件错误：", Event, e)
+                        }
                         break
                       }
                     }
@@ -602,8 +720,7 @@ export default class rw_xr {
                 }
               }
             } catch (e) {
-              console.log("任务物品列表错误", e.message)
-              throw e
+              new Error_xr("任务物品列表错误：", Event, e)
             }
             break
           case "check_list_com":
@@ -624,32 +741,72 @@ export default class rw_xr {
                     let data_now;
                     switch (d_data.type) {
                       case 'actor': {
-                        data_now = new Actor(Data.actors[d_data.id])
-                        data_now.talk = d_data.talk ? d_data.talk : false
+                        try {
+                          data_now = new Actor(Data.actors[d_data.id])
+                          data_now.talk = d_data.talk ? d_data.talk : false
+                        } catch (e) {
+                          new Error_xr("(解析)角色错误：", Event, e)
+                        }
                         break
                       }
                       case 'skill': {
-                        data_now = new Skill(Data.skills[d_data.id])
+                        try {
+                          data_now = new Skill(Data.skills[d_data.id])
+                        } catch (e) {
+                          new Error_xr("(解析)技能错误：", Event, e)
+                        }
                         break
                       }
                       case 'state': {
-                        data_now = new State(Data.states[d_data.id])
+                        try {
+                          data_now = new State(Data.states[d_data.id])
+                        } catch (e) {
+                          new Error_xr("(解析)状态错误：", Event, e)
+                        }
                         break
                       }
                       case 'equip': {
-                        data_now = new Equipment(Data.equipments[d_data.id])
+                        try {
+                          data_now = new Equipment(Data.equipments[d_data.id])
+                        } catch (e) {
+                          new Error_xr("(解析)装备错误：", Event, e)
+                        }
                         break
                       }
                       case 'item': {
-                        data_now = new Item(Data.items[d_data.id])
-                        data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                        try {
+                          data_now = new Item(Data.items[d_data.id])
+                          data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
+                        } catch (e) {
+                          new Error_xr("(解析)物品错误：", Event, e)
+                        }
                         break
                       }
                       case 'var': {
                         // 变量计算
-                        let v_data = Variable.get(d_data.id)
-                        let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
-                        data_now = { ...d_data, calc: new Function(eval_str)() }
+                        try {
+                          let v_data = Variable.get(d_data.id)
+                          let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
+                          data_now = { ...d_data, calc: new Function(eval_str)() }
+                        } catch (e) {
+                          new Error_xr("(解析)变量错误：", Event, e)
+                        }
+                        break
+                      }
+                      case 'event': {
+                        try {
+                          let num = parseFloat(d_data.num)
+                          const commands = EventManager.guidMap[d_data.id]
+                          if (commands) {
+                            for (let i = 0; i < num; i++) {
+                              const event = new EventHandler(commands)
+                              event.attributes["@index"] = i
+                              EventHandler.call(event)
+                            }
+                          }
+                        } catch (e) {
+                          new Error_xr("(解析)事件错误：", Event, e)
+                        }
                         break
                       }
                     }
@@ -660,7 +817,7 @@ export default class rw_xr {
                 }
               }
             } catch (e) {
-              console.log("任务物品列表错误", e.message)
+              new Error_xr("任务完成物品列表错误：", Event, e)
               throw e
             }
             break
@@ -669,7 +826,6 @@ export default class rw_xr {
             break
         }
         break
-
       case "advanced":
         switch (this.advanced_op) {
           case "get":
@@ -699,8 +855,7 @@ export default class rw_xr {
                 }
               }
             } catch (e) {
-              console.log("获取键值错误", e.message)
-              throw e
+              new Error_xr("获取键值错误：", Event, e)
             }
             break
           case "set":
@@ -716,8 +871,7 @@ export default class rw_xr {
                 }
               }
             } catch (e) {
-              console.log("设置键值错误", e.message)
-              throw e
+              new Error_xr("设置键值错误：", Event, e)
             }
             break
           case "add_con":
@@ -739,6 +893,9 @@ export default class rw_xr {
           case "save":
             this.saveRwData(xr.compileVar(this.rw_data_num))
             break
+          case "show":
+            xr.showInfo()
+            break
         }
         break
     }
@@ -759,7 +916,7 @@ export default class rw_xr {
     }
     // 解析任务物品
     let map_to = [
-      "item", "actor", "skill", "equip", "state", "var"
+      "item", "actor", "skill", "equip", "state", "var", "event"
     ]
     // 编译物品列表
     let item_jx = []
@@ -770,6 +927,7 @@ export default class rw_xr {
       item_ex = {
         item: { num: parseFloat(String(str_splice[2]).trim()) },
         equip: { num: parseFloat(String(str_splice[2]).trim()) },
+        event: { num: parseFloat(String(str_splice[2]).trim()) },
         actor: { talk: false },
         var: { op: String(str_splice[2]).trim(), val: String(str_splice[3]).trim(), name: str_splice[4]?.trim() }
       }
@@ -801,6 +959,7 @@ export default class rw_xr {
       item_ex1 = {
         item: { num: parseFloat(String(str_splice[2]).trim()) },
         equip: { num: parseFloat(String(str_splice[2]).trim()) },
+        event: { num: parseFloat(String(str_splice[2]).trim()) },
         actor: { talk: false },
         var: { op: String(str_splice[2]).trim(), val: String(str_splice[3]).trim(), name: str_splice[4]?.trim() }
       }
@@ -892,6 +1051,8 @@ export default class rw_xr {
       for (let i in items) {
         let item = items[i]
         let aci = Party.player?.inventory
+        let acs = Party.player?.skillManager
+        let acst = Party.player?.stateManager
         // 如果是物品
         if (item.type == "item") {
           // 判断id是否存在，存在就在里面取数量
@@ -927,9 +1088,20 @@ export default class rw_xr {
             now_duibi.push(true)
             continue
           }
+        } else if (item.type == "skill") {
+          if (acs.get(item?.id)) {
+            now_duibi.push(true)
+            continue
+          }
+        } else if (item.type == "state") {
+          if (acst.get(item?.id)) {
+            now_duibi.push(true)
+            continue
+          }
         }
         now_duibi.push(false)
       }
+      _cacheMap = undefined
       if (duibi.length === now_duibi.length && duibi.every((v, i) => v === now_duibi[i])) {
         return true
       } else {

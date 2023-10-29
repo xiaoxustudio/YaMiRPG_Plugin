@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-29 11:57:46
+ * @LastEditTime: 2023-10-29 16:05:29
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -941,11 +941,11 @@ export default class rw_xr {
         }
         // 检测变量任务是否有效
         if (String(str_splice[0]).trim() == "var") {
-          if (!item_ex[str_splice[0]].op || !item_ex[str_splice[0]].val) {
+          if (!item_ex[String(str_splice[0]).trim()].op || !item_ex[String(str_splice[0]).trim()].val) {
             continue
           }
-          if (!item_ex[str_splice[0]].name) {
-            item_ex[str_splice[0]].name = "全局变量" + str_splice[1]
+          if (!item_ex[String(str_splice[0]).trim()].name) {
+            item_ex[String(str_splice[0]).trim()].name = "全局变量" + str_splice[1]
           }
         }
         item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex[String(str_splice[0]).trim()] })
@@ -973,11 +973,11 @@ export default class rw_xr {
         }
         // 检测变量任务是否有效
         if (String(str_splice[0]).trim() == "var") {
-          if (!item_ex1[str_splice[0]].op || !item_ex1[str_splice[0]].val) {
+          if (!item_ex1[String(str_splice[0]).trim()].op || !item_ex1[String(str_splice[0]).trim()].val) {
             continue
           }
-          if (!item_ex1[str_splice[0]].name) {
-            item_ex1[str_splice[0]].name = "全局变量" + str_splice[1]
+          if (!item_ex1[String(str_splice[0]).trim()].name) {
+            item_ex1[String(str_splice[0]).trim()].name = "全局变量" + str_splice[1]
           }
         }
         complete_item.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex1[String(str_splice[0]).trim()] })

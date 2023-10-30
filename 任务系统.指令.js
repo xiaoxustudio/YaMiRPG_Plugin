@@ -1,6 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-30 13:59:05
+ * @LastEditTime: 2023-10-30 23:47:27
+ * @GitHub: www.github.com/xiaoxustudio
+ * @WebSite: www.xiaoxustudio.top
+ * @Description: By xuranXYS
+ */
+/*
+ * @Author: xuranXYS
+ * @LastEditTime: 2023-10-30 19:47:05
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -15,9 +22,7 @@
 任务系统
 可进行添加任务，删除任务，保存任务数据等操作
 
-任务标识如果为0，则不会添加任务（除非开启是索引选项：使用索引查找任务）
-
-任务[完成]物品列表类型标识：（未知类型将不会被添加）
+任务[完成]物品列表类型标识：（未知类型将不会被添加，除非开启强制添加）
 item（物品）, actor（角色）, equip（装备），skill（技能）,state（状态），trigger（触发器），elem（元素）
 var（全局变量）, event（事件）
 
@@ -33,6 +38,10 @@ trigger（触发器）：类型，id，别名（将会被显示在任务中）
 PS（注意事项）：
 事件类型会在遍历的时候自动执行，内置变量：@index ：循环索引
 任务是否可以完成指令不能处理trigger（触发器），elem（元素），需要自定义回调事件，不可处理的类型将会被传入回调事件
+开启强制添加后，输入的第一个参数会称为自定义类型，第二个为id
+但从id开始，后面组块需要使用key:value格式定义属性
+定义的key:value会被作为属性添加进对应item里面，重复定义的只保留首次（可用变量）
+
 
 《任务是否可以完成》指令回调事件：
 内置变量：
@@ -63,6 +72,21 @@ PS（注意事项）：
 
 切换到下一个任务：会切换到链接相对于的任务
 
+大部分可输入框使用标识：
+<local:var_name>
+<global:var_name>
+<local:'actor'->'triggerActor'>
+<local:'cactor'->'casterActor'>
+<local:'skill'->'triggerSkill'>
+<local:'state'->'triggerState'>
+<local:'equip'->'triggerEquipment'>
+<local:'item'->'triggerItem'>
+<local:'object'->'triggerObject'>
+<local:'light'->'triggerLight'>
+<local:'region'->'triggerRegion'>
+<local:'elem'->'triggerElement'>
+
+
 @option op {"base","advanced","other"}
 @alias 操作 {基础操作,高级操作,其他操作}
 
@@ -81,12 +105,14 @@ PS（注意事项）：
 @cond other_op {"read","save","remove"}
 @desc 用于操作任务数据的索引
 
-@option advanced_op {"get","set","add_con","dis_con","add_e"}
-@alias 子操作 {获取任务键,设置任务键,链接任务,断开链接,添加额外任务结构}
+@option advanced_op {"get","set","get_itemkey","set_itemkey","add_con","dis_con","add_e"}
+@alias 子操作 {获取任务键,设置任务键,获取物品键,设置物品键,链接任务,断开链接,添加额外任务结构}
 @cond op {"advanced"}
 @desc
 获取任务键：获取任务属性
 设置任务键：设置任务属性
+获取物品键：获取指定任务匹配的物品键值
+设置物品键：设置指定任务匹配的物品键值
 链接任务：将指定任务和目标任务链接
 断开链接：断开指定任务的链接关系
 添加额外任务结构：对任务数据结构添加额外的属性
@@ -103,7 +129,7 @@ PS（注意事项）：
 
 @string ad_get
 @alias 任务对象变量
-@cond advanced_op {"get","set"}
+@cond advanced_op {"get","set","get_itemkey","set_itemkey"}
 @desc 传入一个任务对象
 
 @string ad_exp
@@ -116,10 +142,31 @@ PS（注意事项）：
 @cond advanced_op {"set"}
 @desc 任务值表达式（多个用英文逗号分割）
 
+@option itemkey_type {"item","complete_item"}
+@alias 匹配类型 {开启任务物品列表,完成任务物品列表}
+@cond advanced_op {"get_itemkey","set_itemkey"}
+@desc 匹配开启任务物品列表或者完成任务物品列表
+
+@string itemkey_attr
+@alias 匹配属性
+@cond advanced_op {"get_itemkey","set_itemkey"}
+@desc 通过匹配属性确定项位置（类型,id）
+
+@string itemkey_key
+@alias 物品键表达式
+@cond advanced_op {"get_itemkey","set_itemkey"}
+@desc 物品键表达式（多个用英文逗号分割）
+
+@string itemkey_val
+@alias 物品值表达式
+@cond advanced_op {"set_itemkey"}
+@desc 物品值表达式（多个用英文逗号分割）
+
 @boolean not_string
 @alias 不是字符串
 @desc 设置之后将会将值解析为js值
-@cond advanced_op {"set"}
+@cond advanced_op {"set_itemkey"}
+
 
 @string[] rw_struct
 @alias 额外任务数据结构
@@ -129,7 +176,7 @@ PS（注意事项）：
 
 @string ad_save_var
 @alias 保存到本地变量
-@cond advanced_op {"get"}
+@cond advanced_op {"get","get_itemkey"}
 @desc 将操作的结果保存到变量
 
 @option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","check_list_com","is_complete"}
@@ -194,6 +241,11 @@ event（事件）：类型，id，执行次数
 
 PS：事件类型会在遍历的时候自动执行，内置变量：@index ：循环索引
 
+@boolean is_force_add
+@alias 强制添加
+@default false
+@cond base_op {"add"}
+@desc 任务[完成]物品列表不允许使用其他类型，开启后可跳过检测强制添加
 
 @string remove_rw
 @alias 移除任务标识
@@ -624,7 +676,7 @@ export default class rw_xr {
                 tag: xr.compileVar(this.tag_rw),
                 item: this.item_list_str,
                 c_item: this.item_list_com
-              })
+              }, this.is_force_add)
             } catch (e) {
               new Error_xr("添加任务错误：", Event, e)
             }
@@ -756,22 +808,21 @@ export default class rw_xr {
                 if (str_split.length > 1) {
                   let is_obj_self = false
                   // 自己是否是对象，是的话从自身获取
-                  if (typeof ad_data == "object") {
-                    is_obj_self = true
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
                   }
                   // 填充数字键
                   let save_arr = {}
                   for (let j = 0; j < str_split.length; j++) {
-                    save_arr[String(j)] = is_obj_self ? ad_data?.[str_split?.[j]] : Event.attributes[ad_data]?.[str_split?.[j]]
+                    save_arr[String(j)] = xr.compileVar(ad_data?.[str_split?.[j]])
                   }
                   Event.attributes[this.ad_save_var] = save_arr
                 } else {
-                  let is_obj_self = false
                   // 自己是否是对象，是的话从自身获取
-                  if (typeof ad_data == "object") {
-                    is_obj_self = true
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
                   }
-                  Event.attributes[this.ad_save_var] = is_obj_self ? ad_data?.[this.ad_exp] : Event.attributes[ad_data]?.[this.ad_exp]
+                  Event.attributes[this.ad_save_var] = xr.compileVar(ad_data?.[this.ad_exp])
                 }
               }
             } catch (e) {
@@ -784,7 +835,7 @@ export default class rw_xr {
               if (ad_data) {
                 let str_split = String(this.ad_exp).trim().split(",")
                 if (str_split.length > 1) {
-                  setNestedProperty(String(this.ad_exp), String(this.ad_exp_val), Event.attributes[ad_data])
+                  setNestedProperty(String(this.ad_exp), xr.compileVar(String(this.ad_exp_val)), Event.attributes[ad_data])
                 } else {
                   let val = xr.compileVar(this.ad_exp_val)
                   Event.attributes[ad_data][this.ad_exp] = this.not_string ? new Function("return " + val)() : val
@@ -792,6 +843,87 @@ export default class rw_xr {
               }
             } catch (e) {
               new Error_xr("设置键值错误：", Event, e)
+            }
+            break
+          case "get_itemkey":
+            try {
+              var ad_data = xr.compileVar(this.ad_get)
+              var sp = xr.compileVar(this.itemkey_attr)
+              if (ad_data && sp) {
+                let str_split = xr.compileVar(this.itemkey_key).trim().split(",")
+                // 匹配属性
+                let attr_split = sp.trim().split(",")
+                if (str_split.length > 1) {
+                  // 自己是否是对象，是的话从自身获取
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
+                  }
+                  // 填充数字键
+                  let save_arr = {}
+                  ad_data[this.itemkey_type].forEach((k) => {
+                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                      // 循环获取属性
+                      for (let j in str_split) {
+                        save_arr[String(j)] = k[str_split[j].trim()]
+                      }
+                      return true
+                    }
+                  })
+                  Event.attributes[this.ad_save_var] = save_arr
+                } else {
+                  // 自己是否是对象，是的话从自身获取
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
+                  }
+                  ad_data[this.itemkey_type].forEach((k) => {
+                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                      // 获取属性
+                      Event.attributes[this.ad_save_var] = k[str_split[0].trim()]
+                      return true
+                    }
+                  })
+                }
+              }
+            } catch (e) {
+              new Error_xr("获取物品键值错误：", Event, e)
+            }
+            break
+          case "set_itemkey":
+            try {
+              var ad_data = xr.compileVar(this.ad_get)
+              var sp = xr.compileVar(this.itemkey_attr)
+              if (ad_data && sp) {
+                let str_split = xr.compileVar(this.itemkey_key).trim().split(",")
+                // 自己是否是对象，是的话从自身获取
+                if (!(typeof ad_data == "object")) {
+                  ad_data = Event.attributes[ad_data]
+                }
+                // 匹配属性
+                let attr_split = sp.trim().split(",")
+                let val = xr.compileVar(this.itemkey_val).split(",")
+                if (str_split.length > 1) {
+                  ad_data[this.itemkey_type].forEach((k) => {
+                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                      // 循环设置属性
+                      for (let j in str_split) {
+                        k[str_split[String(j)].trim()] = this.not_string ? new Function("return " + val[j])() : val[j]
+                      }
+                      return true
+                    }
+                  })
+                } else {
+                  let val = xr.compileVar(this.itemkey_val)
+                  ad_data[this.itemkey_type].forEach((k) => {
+                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                      // 设置属性
+                      k[str_split[0].trim()] = this.not_string ? new Function("return " + val)() : val
+                      return true
+                    }
+                  })
+                }
+              }
+            } catch (e) {
+              new Error_xr("设置物品键值错误：", Event, e)
             }
             break
           case "add_con":
@@ -913,13 +1045,35 @@ export default class rw_xr {
     return data_now
   }
   /**
+   * @description: 获取任务物品列表
+   * @param {*} tag
+   * @param {*} type  0（开启任务列表）|| 1（完成任务列表）
+   * @return {*}
+   */
+  get_item_list(tag, type = 0) {
+    let find = this.get_task(tag)
+    if (find) {
+      return undefined
+    }
+    switch (this.type) {
+      case 0:
+        return find.item
+      case 1:
+        return find.complete_item
+    }
+  }
+  /**
    * @description: 添加任务
    * @param {*} title
    * @param {*} desc
+   * @param {*} item
+   * @param {*} c_item
+   * @param {*} state
    * @param {*} tag
+   * @param {*} is_force_add 强制添加
    * @return {*}
    */
-  add_task({ title, desc, item = [], c_item = [], state = false, tag = -1 }) {
+  add_task({ title, desc, item = [], c_item = [], state = false, tag = -1 }, is_force_add = false) {
     // 额外属性
     let ex_data = {}
     for (let i = 0; i < this.rw_struct.length; i++) {
@@ -942,7 +1096,7 @@ export default class rw_xr {
         trigger: { name: String(str_splice[2]).trim() },
         elem: { name: String(str_splice[2]).trim() },
         actor: { talk: false },
-        var: { op: String(str_splice[2]).trim(), val: String(str_splice[3]).trim(), name: str_splice[4]?.trim() }
+        var: { op: String(str_splice[2]).trim(), val: String(str_splice[3]).trim(), name: str_splice[4]?.trim() },
       }
       // 不是有效任务物品将不会被添加
       if (map_to.includes(String(str_splice[0]).trim())) {
@@ -962,6 +1116,21 @@ export default class rw_xr {
           }
         }
         item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex[String(str_splice[0]).trim()] })
+      } else if (is_force_add) {
+        // 自定义属性
+        //解析额外属性
+        let custom_item_ex = {}
+        for (let ie = 2; ie < str_splice.length; ie++) {
+          let reg = /\s*([^\s].*[^\s])\s*:\s*([^\s].*[^\s])\s*/
+          let keyval = str_splice[ie].trim()
+          if (reg.test(keyval)) {
+            let _arr = keyval.match(reg)
+            if (!custom_item_ex.hasOwnProperty(_arr[1])) {
+              custom_item_ex[xr.compileVar(_arr[1])] = xr.compileVar(_arr[2])
+            }
+          } else { continue }
+        }
+        item_jx.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex[String(str_splice[0]).trim()], ...custom_item_ex })
       }
     }
     // 编译完成物品列表
@@ -996,6 +1165,21 @@ export default class rw_xr {
           }
         }
         complete_item.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex1[String(str_splice[0]).trim()] })
+      } else if (is_force_add) {
+        // 自定义属性
+        //解析额外属性
+        let custom_item_ex = {}
+        for (let ie = 2; ie < str_splice.length; ie++) {
+          let reg = /\s*([^\s].*[^\s])\s*:\s*([^\s].*[^\s])\s*/
+          let keyval = str_splice[ie].trim()
+          if (reg.test(keyval)) {
+            let _arr = keyval.match(reg)
+            if (!custom_item_ex.hasOwnProperty(_arr[1])) {
+              custom_item_ex[xr.compileVar(_arr[1])] = xr.compileVar(_arr[2])
+            }
+          } else { continue }
+        }
+        complete_item.push({ type: String(str_splice[0]).trim(), id: String(str_splice[1]).trim(), ...item_ex1[String(str_splice[0]).trim()], ...custom_item_ex })
       }
     }
     if (tag !== -1) {
@@ -1017,7 +1201,6 @@ export default class rw_xr {
     })
     return f_index
   }
-
   /**
    * @description: 删除任务
    * @param {*} tag 任务标识

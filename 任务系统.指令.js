@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-30 23:47:27
+ * @LastEditTime: 2023-10-31 12:46:54
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -47,6 +47,7 @@ PS（注意事项）：
 内置变量：
 1.@index -> 索引
 2.@result -> 物品转换数据
+2.@result_rw -> 物品原始数据
 3.@return -> 回调返回值：只能为布尔值（true或false）
 根据内置变量@return的返回值判断当前类型是否可以完成
 
@@ -129,8 +130,13 @@ PS（注意事项）：
 
 @string ad_get
 @alias 任务对象变量
-@cond advanced_op {"get","set","get_itemkey","set_itemkey"}
+@cond advanced_op {"get","set"}
 @desc 传入一个任务对象
+
+@string ad_get_itemkey
+@alias 对象变量
+@cond advanced_op {"get_itemkey","set_itemkey"}
+@desc 传入一个任务对象或者是自定义类型项对象
 
 @string ad_exp
 @alias 任务键表达式
@@ -847,7 +853,7 @@ export default class rw_xr {
             break
           case "get_itemkey":
             try {
-              var ad_data = xr.compileVar(this.ad_get)
+              var ad_data = xr.compileVar(this.ad_get_itemkey)
               var sp = xr.compileVar(this.itemkey_attr)
               if (ad_data && sp) {
                 let str_split = xr.compileVar(this.itemkey_key).trim().split(",")
@@ -860,28 +866,47 @@ export default class rw_xr {
                   }
                   // 填充数字键
                   let save_arr = {}
-                  ad_data[this.itemkey_type].forEach((k) => {
-                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
-                      // 循环获取属性
-                      for (let j in str_split) {
-                        save_arr[String(j)] = k[str_split[j].trim()]
+                  if (ad_data[this.itemkey_type]) {
+                    ad_data?.[this.itemkey_type]?.forEach((k) => {
+                      if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                        // 循环获取属性
+                        for (let j in str_split) {
+                          save_arr[String(j)] = k[str_split[j].trim()]
+                        }
+                        return true
                       }
-                      return true
+                    })
+                  } else {
+                    for (let k in ad_data) {
+                      if (ad_data["id"] == attr_split[1].trim() && ad_data["type"] == attr_split[0].trim()) {
+                        // 循环获取属性
+                        for (let j in str_split) {
+                          save_arr[String(j)] = k[str_split[j].trim()]
+                        }
+                        return true
+                      }
                     }
-                  })
+                  }
                   Event.attributes[this.ad_save_var] = save_arr
                 } else {
                   // 自己是否是对象，是的话从自身获取
                   if (!(typeof ad_data == "object")) {
                     ad_data = Event.attributes[ad_data]
                   }
-                  ad_data[this.itemkey_type].forEach((k) => {
-                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                  if (ad_data[this.itemkey_type]) {
+                    ad_data?.[this.itemkey_type]?.forEach((k) => {
+                      if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                        // 获取属性
+                        Event.attributes[this.ad_save_var] = k[str_split[0].trim()]
+                        return true
+                      }
+                    })
+                  } else {
+                    if (ad_data["id"] == attr_split[1].trim() && ad_data["type"] == attr_split[0].trim()) {
                       // 获取属性
-                      Event.attributes[this.ad_save_var] = k[str_split[0].trim()]
-                      return true
+                      Event.attributes[this.ad_save_var] = ad_data[str_split[0].trim()]
                     }
-                  })
+                  }
                 }
               }
             } catch (e) {
@@ -890,7 +915,7 @@ export default class rw_xr {
             break
           case "set_itemkey":
             try {
-              var ad_data = xr.compileVar(this.ad_get)
+              var ad_data = xr.compileVar(this.ad_get_itemkey)
               var sp = xr.compileVar(this.itemkey_attr)
               if (ad_data && sp) {
                 let str_split = xr.compileVar(this.itemkey_key).trim().split(",")
@@ -902,24 +927,48 @@ export default class rw_xr {
                 let attr_split = sp.trim().split(",")
                 let val = xr.compileVar(this.itemkey_val).split(",")
                 if (str_split.length > 1) {
-                  ad_data[this.itemkey_type].forEach((k) => {
-                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
-                      // 循环设置属性
-                      for (let j in str_split) {
-                        k[str_split[String(j)].trim()] = this.not_string ? new Function("return " + val[j])() : val[j]
+                  if (ad_data[this.itemkey_type]) {
+                    ad_data?.[this.itemkey_type]?.forEach((k) => {
+                      if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                        // 循环设置属性
+                        for (let j in str_split) {
+                          k[str_split[String(j)].trim()] = this.not_string ? new Function("return " + val[j])() : val[j]
+                        }
+                        return true
                       }
-                      return true
+                    })
+                  } else {
+                    for (let k in ad_data) {
+                      if (ad_data["id"] == attr_split[1].trim() && ad_data["type"] == attr_split[0].trim()) {
+                        // 循环设置属性
+                        for (let j in str_split) {
+                          k[str_split[String(j)].trim()] = this.not_string ? new Function("return " + val[j])() : val[j]
+                        }
+                        return true
+                      }
                     }
-                  })
+                  }
                 } else {
                   let val = xr.compileVar(this.itemkey_val)
-                  ad_data[this.itemkey_type].forEach((k) => {
-                    if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                  // 自己是否是对象，是的话从自身获取
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
+                  }
+                  if (ad_data[this.itemkey_type]) {
+                    ad_data?.[this.itemkey_type]?.forEach((k) => {
+                      if (k["id"] == attr_split[1].trim() && k["type"] == attr_split[0].trim()) {
+                        // 设置属性
+                        k[str_split[0].trim()] = this.not_string ? new Function("return " + val)() : val
+                        return true
+                      }
+                    })
+                  } else {
+                    if (ad_data["id"] == attr_split[1].trim() && ad_data["type"] == attr_split[0].trim()) {
                       // 设置属性
-                      k[str_split[0].trim()] = this.not_string ? new Function("return " + val)() : val
+                      ad_data[str_split[0].trim()] = this.not_string ? new Function("return " + val)() : val
                       return true
                     }
-                  })
+                  }
                 }
               }
             } catch (e) {
@@ -1038,6 +1087,14 @@ export default class rw_xr {
           }
         } catch (e) {
           new Error_xr("(解析)事件错误：", Event, e)
+        }
+        break
+      }
+      default: {
+        try {
+          data_now = d_data
+        } catch (e) {
+          new Error_xr("(解析)自定义类型错误：", Event, e)
         }
         break
       }
@@ -1303,6 +1360,7 @@ export default class rw_xr {
             const event = new EventHandler(commands)
             let data_now = this.parse_type(item)
             event.attributes["@result"] = data_now
+            event.attributes["@result_rw"] = item
             event.attributes["@index"] = i
             event.attributes["@return"] = false
             EventHandler.call(event)

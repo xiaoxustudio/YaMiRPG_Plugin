@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-31 12:46:54
+ * @LastEditTime: 2023-10-31 20:50:44
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -57,7 +57,7 @@ PS（注意事项）：
 
 任务遍历用于遍历任务:
 1.@index -> 索引
-2.@result -> 物品转换数据
+2.@result -> 任务数据
 
 任务物品列表遍历会遍历任务的开启物品列表（item属性）：
 1.@index -> 索引
@@ -229,10 +229,10 @@ PS（注意事项）：
 item（物品）,actor（角色）, equip（装备），var（全局变量），skill（技能）,state（状态）：
 类型，id，数量
 
-var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
 event（事件）：类型，id，执行次数
-
-PS：事件类型会在遍历的时候自动执行，内置变量：@index ：循环索引
+var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
+elem（元素）：类型，id，别名（将会被显示在任务中）
+trigger（触发器）：类型，id，别名（将会被显示在任务中）
 
 @string[] item_list_com
 @alias 完成物品列表
@@ -242,8 +242,10 @@ PS：事件类型会在遍历的时候自动执行，内置变量：@index ：�
 item（物品）,actor（角色）, equip（装备），var（全局变量），skill（技能）,state（状态）：
 类型，id，数量
 
-var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
 event（事件）：类型，id，执行次数
+var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
+elem（元素）：类型，id，别名（将会被显示在任务中）
+trigger（触发器）：类型，id，别名（将会被显示在任务中）
 
 PS：事件类型会在遍历的时候自动执行，内置变量：@index ：循环索引
 
@@ -263,8 +265,8 @@ PS：事件类型会在遍历的时候自动执行，内置变量：@index ：�
 @alias 遍历事件
 @cond base_op {"check","check_list","check_list_com"}
 @desc 内置变量：
-1.@result -> 对象
-2.@index -> 索引
+1.@index -> 索引
+2.@result -> 任务数据
 
 @boolean inherit_check
 @alias 继承变量
@@ -293,6 +295,7 @@ PS：事件类型会在遍历的时候自动执行，内置变量：@index ：�
 内置变量：
 1.@index -> 索引
 2.@result -> 物品转换数据
+2.@result_rw -> 物品原始数据
 3.@return -> 回调返回值：只能为布尔值（true或false）
 根据内置变量@return的返回值判断当前类型是否可以完成
 

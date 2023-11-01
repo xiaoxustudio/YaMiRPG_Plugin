@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-01 11:26:17
+ * @LastEditTime: 2023-11-01 18:48:58
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -14,13 +14,13 @@
  */
 /*
 @plugin 任务系统
-@version 1.0
+@version 1.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
 
 任务系统
-可进行添加任务，删除任务，保存任务数据等操作
+可进行添加主线或者是分支任务，删除任务，保存任务数据等操作
 
 任务[完成]物品列表类型标识：（未知类型将不会被添加，除非开启强制添加）
 item（物品）, actor（角色）, equip（装备），skill（技能）,state（状态），trigger（触发器），elem（元素）
@@ -86,25 +86,43 @@ PS（注意事项）：
 <local:'light'->'triggerLight'>
 <local:'region'->'triggerRegion'>
 <local:'elem'->'triggerElement'>
-
+<local:'elem'->'triggerElement'>
 
 @option op {"base","advanced","other"}
 @alias 操作 {基础操作,高级操作,其他操作}
 
-@option other_op {"read","save","remove","show"}
-@alias 子操作 {读取任务数据,保存任务数据,删除任务数据,插件信息显示}
+@option other_op {"read","save","remove","is_branch","change","show"}
+@alias 子操作 {读取任务数据,保存任务数据,删除任务数据,数据源是否为分支,切换数据源,插件信息显示}
 @cond op {"other"}
 @desc 
 读取任务数据：读取保存的任务数据
 保存任务数据：将任务数据保存到存档
 删除任务数据：删除指定存档的任务数据
+数据源是否为分支：判断当前数据源是否为分支
+切换数据源：切换当前数据源为分支或者是主线
 插件信息显示：显示插件信息
+
+@option other_change_type {"master","branch"}
+@alias 数据源类型 {主线存储源,分支存储源}
+@cond other_op {"change"}
+@desc 切换当前数据源为分支或者是主线
+
+@string other_save_var
+@alias 保存到本地变量
+@cond other_op {"is_branch"}
+@desc 将操作的结果保存到变量
 
 @string rw_data_num
 @alias 存档索引
 @default 0
 @cond other_op {"read","save","remove"}
 @desc 用于操作任务数据的索引
+
+@boolean rw_data_format
+@alias 是否格式化存储
+@default false
+@cond other_op {"save"}
+@desc 不进行格式化数据会适当减少存储容量
 
 @option advanced_op {"get","set","get_itemkey","set_itemkey","add_con","dis_con","add_e"}
 @alias 子操作 {获取任务键,设置任务键,获取物品键,设置物品键,链接任务,断开链接,添加额外任务结构}
@@ -123,6 +141,7 @@ PS（注意事项）：
 @cond advanced_op {"add_con","dis_con"}
 @desc 用来标识一个任务的标识
 
+
 @string con_to_tag
 @alias 链接到(任务标识)
 @cond advanced_op {"add_con"}
@@ -138,9 +157,14 @@ PS（注意事项）：
 @cond advanced_op {"get_itemkey","set_itemkey"}
 @desc 传入一个任务对象或者是自定义类型项对象
 
+@option ad_option {"tag","title","type","desc","state","custom"}
+@alias 目标 {标识,标题,类型,描述,状态,自定义}
+@cond advanced_op {"get","set"}
+@desc 对任务的目标属性进行操作
+
 @string ad_exp
 @alias 任务键表达式
-@cond advanced_op {"get","set"}
+@cond ad_option {"custom"}
 @desc 任务键表达式（多个用英文逗号分割）
 
 @string ad_exp_val
@@ -171,7 +195,7 @@ PS（注意事项）：
 @boolean not_string
 @alias 不是字符串
 @desc 设置之后将会将值解析为js值
-@cond advanced_op {"set_itemkey"}
+@cond advanced_op {"set_itemkey","set"}
 
 
 @string[] rw_struct
@@ -478,18 +502,18 @@ class xr {
  * @param {*} obj
  * @return {*}
  */
-function setNestedProperty(a, b, obj) {
-  const pathArr = a.split(',');
-  const propName = pathArr.pop();
-  let nestedObj = obj;
+function setNestedProperty(a, b, obj, not_str = false) {
+  const pathArr = a.split(',')
+  const propName = pathArr.pop()
+  let nestedObj = obj
   for (const path of pathArr) {
     if (!nestedObj.hasOwnProperty(path) || typeof nestedObj[path] !== 'object') {
-      nestedObj[path] = {};
+      nestedObj[path] = {}
     }
-    nestedObj = nestedObj[path];
+    nestedObj = nestedObj[path]
   }
-  nestedObj[propName] = b;
-  return obj;
+  nestedObj[propName] = not_str ? new Function("return " + b)() : b
+  return obj
 }
 /**
  * @description: 错误处理
@@ -552,13 +576,29 @@ class Error_xr {
  * @return {*}
  */
 export default class rw_xr {
-  _data // 数据
+  /**
+   * @description: 主线数据
+   * @return {*}
+   */
+  _data
+  /**
+   * @description: 分支数据
+   * @return {*}
+   */
+  _branch_data
+  /**
+   * @description: 是否是分支
+   * @return {*}
+   */
+  is_state
   current_rw
   config
   connect
   is_close
   constructor() {
     this.data = []
+    this._branch_data = []
+    this.is_state = false
     this.connect = {}
     this.current_rw = 0 // 当前任务
     this.config = {}
@@ -566,14 +606,21 @@ export default class rw_xr {
   }
   // 属性定义
   get data() {
-    return this._data
+    if (!this.is_state) {
+      return this._data
+    } else {
+      return this._branch_data
+    }
   }
   set data(val) {
-    this._data = val
+    if (!this.is_state) {
+      this._data = val
+    } else {
+      this._branch_data = val
+    }
   }
-
   // 定义基础方法
-  saveRwData(number) {
+  saveRwData(number, is_format = false) {
     const suffix = number.toString().padStart(2, '0')
     // MacOS打包缺少写入权限，暂时改成web模式
     let shell = Stats.shell
@@ -586,11 +633,12 @@ export default class rw_xr {
         const dataPath = File.route(`$/Save/save_xr${suffix}.save`)
         let struct = {
           current: this.current_rw,
-          config: this.config,
-          data: this.data,
+          config: { is_state: this.is_state, ...this.config },
+          _data: this._data,
+          _branch_data: this._branch_data,
           connect: this.connect
         }
-        const dataText = JSON.stringify(struct, null, 2)
+        const dataText = is_format ? JSON.stringify(struct, null, 2) : JSON.stringify(struct)
         const fsp = require('fs').promises
         return fsp.stat(saveDir).catch(error => {
           // 如果不存在存档文件夹，创建它
@@ -604,8 +652,9 @@ export default class rw_xr {
         const dataKey = `save_xr${suffix}.save`
         let struct = {
           current: this.current_rw,
-          config: this.config,
-          data: this.data,
+          config: { is_state: this.is_state, ...this.config },
+          _data: this._data,
+          _branch_data: this._branch_data,
           connect: this.connect
         }
         return Promise.all([
@@ -630,8 +679,10 @@ export default class rw_xr {
           const json = require('fs').readFileSync(path)
           let res = JSON.parse(json)
           this.current_rw = res.current
-          this.data = res.data
-          this.config = res.config
+          this._data = res._data
+          this._branch_data = res._branch_data
+          this.config = { ...res.config }
+          this.is_state = res.config["is_state"]
           this.connect = res.connect
         } catch (error) {
           console.warn(error)
@@ -642,8 +693,10 @@ export default class rw_xr {
         const key = `save${suffix}.save`
         let res = await IDB.getItem(key)
         this.current_rw = res.current
-        this.data = res.data
-        this.config = res.config
+        this._data = res._data
+        this._branch_data = res._branch_data
+        this.config = { ...res.config }
+        this.is_state = res.config["is_state"]
         this.connect = res.connect
         break
       }
@@ -815,6 +868,9 @@ export default class rw_xr {
               var ad_data = xr.compileVar(this.ad_get)
               if (ad_data) {
                 let str_split = String(this.ad_exp).trim().split(",")
+                if (this.ad_option != "custom") {
+                  str_split = String(this.ad_option).split(",")
+                }
                 if (str_split.length > 1) {
                   let is_obj_self = false
                   // 自己是否是对象，是的话从自身获取
@@ -832,7 +888,7 @@ export default class rw_xr {
                   if (!(typeof ad_data == "object")) {
                     ad_data = Event.attributes[ad_data]
                   }
-                  Event.attributes[this.ad_save_var] = xr.compileVar(ad_data?.[this.ad_exp])
+                  Event.attributes[this.ad_save_var] = xr.compileVar(ad_data?.[str_split[0]])
                 }
               }
             } catch (e) {
@@ -844,11 +900,21 @@ export default class rw_xr {
               var ad_data = xr.compileVar(this.ad_get)
               if (ad_data) {
                 let str_split = String(this.ad_exp).trim().split(",")
+                if (this.ad_option != "custom") {
+                  str_split = String(this.ad_option).split(",")
+                }
                 if (str_split.length > 1) {
-                  setNestedProperty(String(this.ad_exp), xr.compileVar(String(this.ad_exp_val)), Event.attributes[ad_data])
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
+                  }
+                  setNestedProperty(String(this.ad_exp), xr.compileVar(String(this.ad_exp_val)), ad_data, this.not_string)
                 } else {
+                  // 自己是否是对象，是的话从自身获取
+                  if (!(typeof ad_data == "object")) {
+                    ad_data = Event.attributes[ad_data]
+                  }
                   let val = xr.compileVar(this.ad_exp_val)
-                  Event.attributes[ad_data][this.ad_exp] = this.not_string ? new Function("return " + val)() : val
+                  ad_data[str_split[0].trim()] = this.not_string ? new Function("return " + val)() : val
                 }
               }
             } catch (e) {
@@ -996,10 +1062,25 @@ export default class rw_xr {
             this.deleteRWData(xr.compileVar(this.rw_data_num))
             break
           case "save":
-            this.saveRwData(xr.compileVar(this.rw_data_num))
+            this.saveRwData(xr.compileVar(this.rw_data_num), this.rw_data_format)
             break
           case "show":
             xr.showInfo()
+            break
+          case "is_branch":
+            Event.attributes[this.other_save_var] = this.is_state
+            break
+          case "change":
+            //如果当前数据源是切换的数据源则不操作
+            if (this.other_change_type == "master") {
+              if (this.is_state) {
+                this.is_state = false
+              }
+            } else if (this.other_change_type == "branch") {
+              if (!this.is_state) {
+                this.is_state = true
+              }
+            }
             break
         }
         break
@@ -1182,7 +1263,7 @@ export default class rw_xr {
         //解析额外属性
         let custom_item_ex = {}
         for (let ie = 2; ie < str_splice.length; ie++) {
-          let reg = /\s*([^\s].*[^\s])\s*:\s*([^\s].*[^\s])\s*/
+          let reg = /\s*(.*)\s*:\s*(.*)\s*/
           let keyval = str_splice[ie].trim()
           if (reg.test(keyval)) {
             let _arr = keyval.match(reg)
@@ -1231,7 +1312,7 @@ export default class rw_xr {
         //解析额外属性
         let custom_item_ex = {}
         for (let ie = 2; ie < str_splice.length; ie++) {
-          let reg = /\s*([^\s].*[^\s])\s*:\s*([^\s].*[^\s])\s*/
+          let reg = /\s*(.*)\s*:\s*(.*)\s*/
           let keyval = str_splice[ie].trim()
           if (reg.test(keyval)) {
             let _arr = keyval.match(reg)

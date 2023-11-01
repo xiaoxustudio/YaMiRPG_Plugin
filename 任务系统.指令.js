@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-31 20:50:44
+ * @LastEditTime: 2023-11-01 11:26:17
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -266,7 +266,8 @@ PS：事件类型会在遍历的时候自动执行，内置变量：@index ：�
 @cond base_op {"check","check_list","check_list_com"}
 @desc 内置变量：
 1.@index -> 索引
-2.@result -> 任务数据
+2.@result -> 任务数据（[完成]物品列表：物品转换数据（通常是个对象））
+3.@result_rw -> 物品原始数据（[完成]物品列表）
 
 @boolean inherit_check
 @alias 继承变量

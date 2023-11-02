@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-01 18:48:58
+ * @LastEditTime: 2023-11-02 13:35:58
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -14,7 +14,7 @@
  */
 /*
 @plugin 任务系统
-@version 1.1
+@version 1.2
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -24,12 +24,14 @@
 
 任务[完成]物品列表类型标识：（未知类型将不会被添加，除非开启强制添加）
 item（物品）, actor（角色）, equip（装备），skill（技能）,state（状态），trigger（触发器），elem（元素）
-var（全局变量）, event（事件）
+var（全局变量）, event（事件）, master（主线） , branch（支线）
 
 使用方法：
-item（物品）,actor（角色）, equip（装备），var（全局变量），skill（技能）,state（状态）：
+item（物品）,actor（角色）, equip（装备），skill（技能）,state（状态）：
 类型，id，数量
 
+master（主线）：类型，id
+branch（支线）：类型，id
 event（事件）：类型，id，执行次数
 var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
 elem（元素）：类型，id，别名（将会被显示在任务中）
@@ -37,7 +39,9 @@ trigger（触发器）：类型，id，别名（将会被显示在任务中）
 
 PS（注意事项）：
 事件类型会在遍历的时候自动执行，内置变量：@index ：循环索引
-任务是否可以完成指令不能处理trigger（触发器），elem（元素），需要自定义回调事件，不可处理的类型将会被传入回调事件
+不能处理的类型：trigger（触发器），elem（元素），master（主线），branch（支线）
+
+任务是否可以完成指令不能处理某些类型，需要自定义回调事件，不可处理的类型将会被传入回调事件
 开启强制添加后，输入的第一个参数会称为自定义类型，第二个为id
 但从id开始，后面组块需要使用key:value格式定义属性
 定义的key:value会被作为属性添加进对应item里面，重复定义的只保留首次（可用变量）
@@ -250,9 +254,11 @@ PS（注意事项）：
 @cond base_op {"add"}
 @desc 任务的表达式物品列表（用于检测任务）
 使用方法：
-item（物品）,actor（角色）, equip（装备），var（全局变量），skill（技能）,state（状态）：
+item（物品）,actor（角色）, equip（装备），skill（技能）,state（状态）：
 类型，id，数量
 
+master（主线）：类型，id
+branch（支线）：类型，id
 event（事件）：类型，id，执行次数
 var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
 elem（元素）：类型，id，别名（将会被显示在任务中）
@@ -263,9 +269,11 @@ trigger（触发器）：类型，id，别名（将会被显示在任务中）
 @cond base_op {"add"}
 @desc 任务的表达式物品列表（用于完成任务后）
 使用方法：
-item（物品）,actor（角色）, equip（装备），var（全局变量），skill（技能）,state（状态）：
+item（物品）,actor（角色）, equip（装备），skill（技能）,state（状态）：
 类型，id，数量
 
+master（主线）：类型，id
+branch（支线）：类型，id
 event（事件）：类型，id，执行次数
 var（全局变量）：类型，id，条件 ，值 ，别名（将会被显示在任务中）
 elem（元素）：类型，id，别名（将会被显示在任务中）
@@ -416,24 +424,30 @@ class xr {
     let regex = /<(.*?):(.*?)>+/g;
     let matches = [];
     let match;
+    // 内置变量
+    let mapTo = {
+      'actor': 'triggerActor',
+      'cactor': 'casterActor',
+      'skill': 'triggerSkill',
+      'state': 'triggerState',
+      'equip': 'triggerEquipment',
+      'item': 'triggerItem',
+      'object': 'triggerObject',
+      'light': 'triggerLight',
+      'region': 'triggerRegion',
+      'elem': 'triggerElement',
+    }
     while ((match = regex.exec(msg)) !== null) {
       matches.push({ type: match[1], content: match[2] });
     }
     for (let i in matches) {
-      if (matches[i]["type"] == "local") {
-        // 内置变量
-        let mapTo = {
-          'actor': 'triggerActor',
-          'cactor': 'casterActor',
-          'skill': 'triggerSkill',
-          'state': 'triggerState',
-          'equip': 'triggerEquipment',
-          'item': 'triggerItem',
-          'object': 'triggerObject',
-          'light': 'triggerLight',
-          'region': 'triggerRegion',
-          'elem': 'triggerElement',
+      for (let na in mapTo) {
+        if (matches[i]["type"] == na) {
+          return Event.attributes[matches[i]["type"]]["attributes"][matches[i]["content"]]
         }
+      }
+      //其他类型
+      if (matches[i]["type"] == "local") {
         for (let k in mapTo) {
           if (k == matches[i]["content"]) {
             matches[i]["content"] = mapTo[k]
@@ -485,10 +499,6 @@ class xr {
             xr.get_global(matches[i]["content"])
           );
         }
-      }
-      // 获取attributes属性
-      if (matches[i]["type"] == "target") {
-        return Event.attributes[matches[i]["content"]]["attributes"]["target"]
       }
     }
     return msg
@@ -592,15 +602,19 @@ export default class rw_xr {
    */
   is_state
   current_rw
+  current_rw_branch
   config
-  connect
+  _connect
+  _connect_branch
   is_close
   constructor() {
-    this.data = []
+    this._data = []
     this._branch_data = []
     this.is_state = false
-    this.connect = {}
+    this._connect = {}
+    this._connect_branch = {}
     this.current_rw = 0 // 当前任务
+    this.current_rw_branch = 0
     this.config = {}
     this.is_close = false // 默认不关闭作者信息显示
   }
@@ -619,6 +633,20 @@ export default class rw_xr {
       this._branch_data = val
     }
   }
+  get connect() {
+    if (!this.is_state) {
+      return this._connect
+    } else {
+      return this._connect_branch
+    }
+  }
+  set connect(val) {
+    if (!this.is_state) {
+      this._connect = val
+    } else {
+      this._connect_branch = val
+    }
+  }
   // 定义基础方法
   saveRwData(number, is_format = false) {
     const suffix = number.toString().padStart(2, '0')
@@ -633,10 +661,12 @@ export default class rw_xr {
         const dataPath = File.route(`$/Save/save_xr${suffix}.save`)
         let struct = {
           current: this.current_rw,
+          current_b: this.current_rw_branch,
           config: { is_state: this.is_state, ...this.config },
           _data: this._data,
           _branch_data: this._branch_data,
-          connect: this.connect
+          _connect: this._connect,
+          _connect_branch: this._connect_branch,
         }
         const dataText = is_format ? JSON.stringify(struct, null, 2) : JSON.stringify(struct)
         const fsp = require('fs').promises
@@ -652,10 +682,12 @@ export default class rw_xr {
         const dataKey = `save_xr${suffix}.save`
         let struct = {
           current: this.current_rw,
+          current_b: this.current_rw_branch,
           config: { is_state: this.is_state, ...this.config },
           _data: this._data,
           _branch_data: this._branch_data,
-          connect: this.connect
+          _connect: this._connect,
+          _connect_branch: this._connect_branch,
         }
         return Promise.all([
           IDB.setItem(dataKey, struct),
@@ -679,11 +711,13 @@ export default class rw_xr {
           const json = require('fs').readFileSync(path)
           let res = JSON.parse(json)
           this.current_rw = res.current
+          this.current_rw_branch = res.current_b
           this._data = res._data
           this._branch_data = res._branch_data
           this.config = { ...res.config }
           this.is_state = res.config["is_state"]
-          this.connect = res.connect
+          this._connect = res._connect
+          this._connect_branch = res._connect_branch
         } catch (error) {
           console.warn(error)
           return
@@ -693,11 +727,13 @@ export default class rw_xr {
         const key = `save${suffix}.save`
         let res = await IDB.getItem(key)
         this.current_rw = res.current
+        this.current_rw_branch = res.current_b
         this._data = res._data
         this._branch_data = res._branch_data
         this.config = { ...res.config }
         this.is_state = res.config["is_state"]
-        this.connect = res.connect
+        this._connect = res._connect
+        this._connect_branch = res._connect_branch
         break
       }
     }
@@ -756,7 +792,11 @@ export default class rw_xr {
             }
             break
           case "set_default":
-            this.current_rw = xr.compileVar(this.tag_rw)
+            if (this.is_state) {
+              this.current_rw_branch = xr.compileVar(this.tag_rw)
+            } else {
+              this.current_rw = xr.compileVar(this.tag_rw)
+            }
             break
           case "get_default":
             Event.attributes[this.save_var] = this.get_current()
@@ -764,7 +804,11 @@ export default class rw_xr {
           case "change_next":
             let next = this.get_connect(this.current_rw)
             if (next != -1 && next) {
-              this.current_rw = next
+              if (this.is_state) {
+                this.current_rw_branch = next
+              } else {
+                this.current_rw = next
+              }
             }
             break
           case "check":
@@ -1094,7 +1138,7 @@ export default class rw_xr {
         try {
           data_now = UI.get(d_data.id)
         } catch (e) {
-          new Error_xr("(解析)元素错误：", Event, e)
+          new Error_xr("(解析)元素类型错误：", Event, e)
         }
         break
       }
@@ -1102,7 +1146,7 @@ export default class rw_xr {
         try {
           data_now = new Trigger(Data.triggers[d_data.id])
         } catch (e) {
-          new Error_xr("(解析)触发器错误：", Event, e)
+          new Error_xr("(解析)触发器类型错误：", Event, e)
         }
         break
       }
@@ -1111,7 +1155,7 @@ export default class rw_xr {
           data_now = new Actor(Data.actors[d_data.id])
           data_now.talk = d_data.talk ? d_data.talk : false
         } catch (e) {
-          new Error_xr("(解析)角色错误：", Event, e)
+          new Error_xr("(解析)角色类型错误：", Event, e)
         }
         break
       }
@@ -1119,7 +1163,7 @@ export default class rw_xr {
         try {
           data_now = new Skill(Data.skills[d_data.id])
         } catch (e) {
-          new Error_xr("(解析)技能错误：", Event, e)
+          new Error_xr("(解析)技能类型错误：", Event, e)
         }
         break
       }
@@ -1127,7 +1171,7 @@ export default class rw_xr {
         try {
           data_now = new State(Data.states[d_data.id])
         } catch (e) {
-          new Error_xr("(解析)状态错误：", Event, e)
+          new Error_xr("(解析)状态类型错误：", Event, e)
         }
         break
       }
@@ -1135,7 +1179,7 @@ export default class rw_xr {
         try {
           data_now = new Equipment(Data.equipments[d_data.id])
         } catch (e) {
-          new Error_xr("(解析)装备错误：", Event, e)
+          new Error_xr("(解析)装备类型错误：", Event, e)
         }
         break
       }
@@ -1144,7 +1188,7 @@ export default class rw_xr {
           data_now = new Item(Data.items[d_data.id])
           data_now.quantity += parseFloat(d_data.num) < 0 ? 1 : parseFloat(d_data.num)
         } catch (e) {
-          new Error_xr("(解析)物品错误：", Event, e)
+          new Error_xr("(解析)物品类型错误：", Event, e)
         }
         break
       }
@@ -1155,7 +1199,7 @@ export default class rw_xr {
           let eval_str = "return " + v_data + " " + d_data.op + " " + d_data.val + " ? true : false"
           data_now = { ...d_data, calc: new Function(eval_str)() }
         } catch (e) {
-          new Error_xr("(解析)变量错误：", Event, e)
+          new Error_xr("(解析)变量类型错误：", Event, e)
         }
         break
       }
@@ -1171,7 +1215,33 @@ export default class rw_xr {
             }
           }
         } catch (e) {
-          new Error_xr("(解析)事件错误：", Event, e)
+          new Error_xr("(解析)事件类型错误：", Event, e)
+        }
+        break
+      }
+      case 'master': {
+        try {
+          this._data.map((data) => {
+            if (data.tag == d_data.id) {
+              return data_now = data;
+            }
+          })
+          if (!data_now) throw new Error("无法确定主线")
+        } catch (e) {
+          new Error_xr("(解析)主线类型错误：", Event, e)
+        }
+        break
+      }
+      case 'branch': {
+        try {
+          this._branch_data.map((data) => {
+            if (data.tag == d_data.id) {
+              return data_now = data;
+            }
+          })
+          if (!data_now) throw new Error("无法确定分支")
+        } catch (e) {
+          new Error_xr("(解析)分支类型错误：", Event, e)
         }
         break
       }
@@ -1223,7 +1293,7 @@ export default class rw_xr {
     }
     // 解析任务物品
     let map_to = [
-      "item", "actor", "skill", "equip", "state", "var", "event", "trigger", "elem"
+      "item", "actor", "skill", "equip", "state", "var", "event", "trigger", "elem", "branch", "master"
     ]
     // 编译物品列表
     let item_jx = []
@@ -1472,7 +1542,12 @@ export default class rw_xr {
    * @return {*}
    */
   get_current() {
-    let rw = this.get_task(this.current_rw)
+    let rw
+    if (this.is_state) {
+      rw = this.get_task(this.current_rw_branch)
+    } else {
+      rw = this.get_task(this.current_rw)
+    }
     return rw
   }
   /**

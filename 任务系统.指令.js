@@ -1,20 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-02 13:35:58
- * @GitHub: www.github.com/xiaoxustudio
- * @WebSite: www.xiaoxustudio.top
- * @Description: By xuranXYS
- */
-/*
- * @Author: xuranXYS
- * @LastEditTime: 2023-10-30 19:47:05
+ * @LastEditTime: 2023-11-05 13:01:37
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 任务系统
-@version 1.2
+@version 1.3
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -22,7 +15,7 @@
 任务系统
 可进行添加主线或者是分支任务，删除任务，保存任务数据等操作
 
-任务[完成]物品列表类型标识：（未知类型将不会被添加，除非开启强制添加）
+检查[完成]物品列表类型标识：（未知类型将不会被添加，除非开启强制添加）
 item（物品）, actor（角色）, equip（装备），skill（技能）,state（状态），trigger（触发器），elem（元素）
 var（全局变量）, event（事件）, master（主线） , branch（支线）
 
@@ -55,7 +48,11 @@ PS（注意事项）：
 3.@return -> 回调返回值：只能为布尔值（true或false）
 根据内置变量@return的返回值判断当前类型是否可以完成
 
-《添加额外任务结构》指令可对任务数据结构添加额外的属性
+《添加额外任务结构》指令：
+可对任务数据结构添加额外的属性，key:value会被作为任务额外的属性添加进任务结构，重复定义的只保留首次（可用变量）
+只定义key，则值自动设置为undefined
+value如果格式为(value)，则value的值将会被解析为js值
+
 
 《获取任务键》指令如果获取多个键，则会返回列表（可用遍历指令进行遍历）
 
@@ -63,7 +60,7 @@ PS（注意事项）：
 1.@index -> 索引
 2.@result -> 任务数据
 
-任务物品列表遍历会遍历任务的开启物品列表（item属性）：
+任务物品列表遍历会遍历任务的检查物品列表（item属性）：
 1.@index -> 索引
 2.@result -> 物品转换数据（通常是个对象）
 3.@result_rw -> 物品原始数据
@@ -177,9 +174,9 @@ PS（注意事项）：
 @desc 任务值表达式（多个用英文逗号分割）
 
 @option itemkey_type {"item","complete_item"}
-@alias 匹配类型 {开启任务物品列表,完成任务物品列表}
+@alias 匹配类型 {检查任务物品列表,完成任务物品列表}
 @cond advanced_op {"get_itemkey","set_itemkey"}
-@desc 匹配开启任务物品列表或者完成任务物品列表
+@desc 匹配检查任务物品列表或者完成任务物品列表
 
 @string itemkey_attr
 @alias 匹配属性
@@ -224,7 +221,7 @@ PS（注意事项）：
 获取当前任务：获取当前正在进行中的任务
 切换到下一个任务：切换到当前任务链接对应的任务
 任务遍历：遍历任务数据
-任务物品列表遍历：遍历任务数据的开启物品列表
+任务物品列表遍历：遍历任务数据的检查物品列表
 任务完成物品列表遍历：遍历任务数据的完成物品列表
 任务是否可以完成：检测任务是否满足完成的条件
 
@@ -250,7 +247,7 @@ PS（注意事项）：
 @desc 任务的描述信息
 
 @string[] item_list_str
-@alias 开启物品列表
+@alias 检查物品列表
 @cond base_op {"add"}
 @desc 任务的表达式物品列表（用于检测任务）
 使用方法：
@@ -285,7 +282,7 @@ PS：事件类型会在遍历的时候自动执行，内置变量：@index ：�
 @alias 强制添加
 @default false
 @cond base_op {"add"}
-@desc 任务[完成]物品列表不允许使用其他类型，开启后可跳过检测强制添加
+@desc 检查[完成]物品列表不允许使用其他类型，开启后可跳过检测强制添加
 
 @string remove_rw
 @alias 移除任务标识
@@ -331,6 +328,11 @@ PS：事件类型会在遍历的时候自动执行，内置变量：@index ：�
 2.@result_rw -> 物品原始数据
 3.@return -> 回调返回值：只能为布尔值（true或false）
 根据内置变量@return的返回值判断当前类型是否可以完成
+
+@string[] set_rw_struct
+@alias 设置额外任务属性
+@desc 这里用于设置额外的任务数据属性
+@cond base_op {"add"}
 
 @string save_var
 @alias 保存到本地变量
@@ -607,7 +609,9 @@ export default class rw_xr {
   _connect
   _connect_branch
   is_close
+  extend_struct
   constructor() {
+    this.extend_struct = {} // 扩展任务结构
     this._data = []
     this._branch_data = []
     this.is_state = false
@@ -667,6 +671,7 @@ export default class rw_xr {
           _branch_data: this._branch_data,
           _connect: this._connect,
           _connect_branch: this._connect_branch,
+          extend_struct: this.extend_struct,
         }
         const dataText = is_format ? JSON.stringify(struct, null, 2) : JSON.stringify(struct)
         const fsp = require('fs').promises
@@ -688,6 +693,7 @@ export default class rw_xr {
           _branch_data: this._branch_data,
           _connect: this._connect,
           _connect_branch: this._connect_branch,
+          extend_struct: this.extend_struct,
         }
         return Promise.all([
           IDB.setItem(dataKey, struct),
@@ -718,6 +724,7 @@ export default class rw_xr {
           this.is_state = res.config["is_state"]
           this._connect = res._connect
           this._connect_branch = res._connect_branch
+          this.extend_struct = res.extend_struct
         } catch (error) {
           console.warn(error)
           return
@@ -734,6 +741,7 @@ export default class rw_xr {
         this.is_state = res.config["is_state"]
         this._connect = res._connect
         this._connect_branch = res._connect_branch
+        this.extend_struct = res.extend_struct
         break
       }
     }
@@ -768,6 +776,24 @@ export default class rw_xr {
         switch (this.base_op) {
           case "add":
             try {
+              let _cache_obj = {}
+              try {
+                for (let i in this.set_rw_struct) {
+                  let match = this.set_rw_struct[i].match(/\s*(.*)\s*:\s*((?=\()\(?)\s*(.*)\s*((?=\))\)?)\s*/)
+                  if (match && !_cache_obj.hasOwnProperty(xr.compileVar(match[1].trim()))) {
+                    // 解析成js值
+                    _cache_obj[xr.compileVar(match[1].trim())] = new Function("return " + xr.compileVar(match[3].trim()))()
+                  } else {
+                    let sub_match = this.set_rw_struct[i].match(/\s*(.*)\s*:\s*(.*)\s*/)
+                    if (sub_match && !_cache_obj.hasOwnProperty(xr.compileVar(sub_match[1].trim()))) { _cache_obj[xr.compileVar(sub_match[1].trim())] = xr.compileVar(sub_match[2].trim()) } else {
+                      // 直接添加，但排除空格
+                      _cache_obj[xr.compileVar(this.set_rw_struct[i].trim())] = undefined
+                    }
+                  }
+                }
+              } catch (e) {
+                new Error_xr("（添加任务）解析设置额外任务属性错误：", Event, e)
+              }
               this.add_task({
                 title: xr.compileVar(this.title_rw),
                 type: this.type_rw,
@@ -775,7 +801,7 @@ export default class rw_xr {
                 tag: xr.compileVar(this.tag_rw),
                 item: this.item_list_str,
                 c_item: this.item_list_com
-              }, this.is_force_add)
+              }, _cache_obj, this.is_force_add)
             } catch (e) {
               new Error_xr("添加任务错误：", Event, e)
             }
@@ -1095,6 +1121,25 @@ export default class rw_xr {
           case "dis_con":
             delete this.connect[xr.compileVar(this.con_tag)]
             break
+          case "add_e":
+            try {
+              for (let i in this.rw_struct) {
+                let match = this.rw_struct[i].match(/\s*(.*)\s*:\s*((?=\()\(?)\s*(.*)\s*((?=\))\)?)\s*/)
+                if (match && !this.extend_struct.hasOwnProperty(xr.compileVar(match[1]))) {
+                  // 解析成js值
+                  this.extend_struct[xr.compileVar(match[1])] = new Function("return " + xr.compileVar(match[3]))()
+                } else {
+                  let sub_match = this.rw_struct[i].match(/\s*(.*)\s*:\s*(.*)\s*/)
+                  if (sub_match && !this.extend_struct.hasOwnProperty(xr.compileVar(sub_match[1]))) { this.extend_struct[xr.compileVar(sub_match[1])] = xr.compileVar(sub_match[2]) } else {
+                    // 直接添加，但排除空格
+                    this.extend_struct[xr.compileVar(this.rw_struct[i].trim())] = undefined
+                  }
+                }
+              }
+            } catch (e) {
+              new Error_xr("解析扩展任务结构值错误：", Event, e)
+            }
+            break
         }
         break
       case "other":
@@ -1259,7 +1304,7 @@ export default class rw_xr {
   /**
    * @description: 获取任务物品列表
    * @param {*} tag
-   * @param {*} type  0（开启任务列表）|| 1（完成任务列表）
+   * @param {*} type  0（检查任务列表）|| 1（完成任务列表）
    * @return {*}
    */
   get_item_list(tag, type = 0) {
@@ -1285,12 +1330,7 @@ export default class rw_xr {
    * @param {*} is_force_add 强制添加
    * @return {*}
    */
-  add_task({ title, desc, item = [], c_item = [], state = false, tag = -1 }, is_force_add = false) {
-    // 额外属性
-    let ex_data = {}
-    for (let i = 0; i < this.rw_struct.length; i++) {
-      ex_data[this.rw_struct[i]] = undefined
-    }
+  add_task({ title, desc, item = [], c_item = [], state = false, tag = -1 }, task_extend = {}, is_force_add = false) {
     // 解析任务物品
     let map_to = [
       "item", "actor", "skill", "equip", "state", "var", "event", "trigger", "elem", "branch", "master"
@@ -1395,7 +1435,15 @@ export default class rw_xr {
       }
     }
     if (tag !== -1) {
-      this.data.push({ title, desc, tag, state, item: item_jx, complete_item, ...ex_data })
+      let _e_cache = Object.assign({}, this.extend_struct)
+      // 设置额外任务属性结构
+      for (let key in task_extend) {
+        if (_e_cache.hasOwnProperty(key)) {
+          // 判断值是否相同，不同就设置
+          if (_e_cache[key] != task_extend[key]) _e_cache[key] = task_extend[key]
+        }
+      }
+      this.data.push({ title, desc, tag, state, item: item_jx, complete_item, ..._e_cache })
     }
   }
   /**
@@ -1557,5 +1605,10 @@ export default class rw_xr {
    */
   get_connect(tag) {
     return this.connect[tag] ? this.connect[tag] : -1
+  }
+  onStart() {
+    Scene.on("load", () => {
+      console.log(this.data)
+    })
   }
 }

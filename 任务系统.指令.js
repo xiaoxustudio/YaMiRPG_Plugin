@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-05 13:01:37
+ * @LastEditTime: 2023-11-05 23:10:56
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 任务系统
-@version 1.3
+@version 1.4
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -125,7 +125,7 @@ value如果格式为(value)，则value的值将会被解析为js值
 @cond other_op {"save"}
 @desc 不进行格式化数据会适当减少存储容量
 
-@option advanced_op {"get","set","get_itemkey","set_itemkey","add_con","dis_con","add_e"}
+@option advanced_op {"get_taskkey","set_taskkey","get_itemkey","set_itemkey","add_con","dis_con","add_e"}
 @alias 子操作 {获取任务键,设置任务键,获取物品键,设置物品键,链接任务,断开链接,添加额外任务结构}
 @cond op {"advanced"}
 @desc
@@ -150,7 +150,7 @@ value如果格式为(value)，则value的值将会被解析为js值
 
 @string ad_get
 @alias 任务对象变量
-@cond advanced_op {"get","set"}
+@cond advanced_op {"get_taskkey","set_taskkey"}
 @desc 传入一个任务对象
 
 @string ad_get_itemkey
@@ -158,9 +158,9 @@ value如果格式为(value)，则value的值将会被解析为js值
 @cond advanced_op {"get_itemkey","set_itemkey"}
 @desc 传入一个任务对象或者是自定义类型项对象
 
-@option ad_option {"tag","title","type","desc","state","custom"}
-@alias 目标 {标识,标题,类型,描述,状态,自定义}
-@cond advanced_op {"get","set"}
+@option ad_option {"tag","title","type","desc","state","item","complete_item","custom"}
+@alias 目标 {标识,标题,类型,描述,状态,检测物品列表,完成物品列表,自定义}
+@cond advanced_op {"get_taskkey","set_taskkey"}
 @desc 对任务的目标属性进行操作
 
 @string ad_exp
@@ -170,7 +170,7 @@ value如果格式为(value)，则value的值将会被解析为js值
 
 @string ad_exp_val
 @alias 任务值表达式
-@cond advanced_op {"set"}
+@cond advanced_op {"set_taskkey"}
 @desc 任务值表达式（多个用英文逗号分割）
 
 @option itemkey_type {"item","complete_item"}
@@ -196,7 +196,7 @@ value如果格式为(value)，则value的值将会被解析为js值
 @boolean not_string
 @alias 不是字符串
 @desc 设置之后将会将值解析为js值
-@cond advanced_op {"set_itemkey","set"}
+@cond advanced_op {"set_itemkey","set_taskkey"}
 
 
 @string[] rw_struct
@@ -207,7 +207,7 @@ value如果格式为(value)，则value的值将会被解析为js值
 
 @string ad_save_var
 @alias 保存到本地变量
-@cond advanced_op {"get","get_itemkey"}
+@cond advanced_op {"get_taskkey","get_itemkey"}
 @desc 将操作的结果保存到变量
 
 @option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","check_list_com","is_complete"}
@@ -933,7 +933,7 @@ export default class rw_xr {
         break
       case "advanced":
         switch (this.advanced_op) {
-          case "get":
+          case "get_taskkey": {
             try {
               var ad_data = xr.compileVar(this.ad_get)
               if (ad_data) {
@@ -942,7 +942,6 @@ export default class rw_xr {
                   str_split = String(this.ad_option).split(",")
                 }
                 if (str_split.length > 1) {
-                  let is_obj_self = false
                   // 自己是否是对象，是的话从自身获取
                   if (!(typeof ad_data == "object")) {
                     ad_data = Event.attributes[ad_data]
@@ -965,7 +964,8 @@ export default class rw_xr {
               new Error_xr("获取键值错误：", Event, e)
             }
             break
-          case "set":
+          }
+          case "set_taskkey": {
             try {
               var ad_data = xr.compileVar(this.ad_get)
               if (ad_data) {
@@ -991,6 +991,7 @@ export default class rw_xr {
               new Error_xr("设置键值错误：", Event, e)
             }
             break
+          }
           case "get_itemkey":
             try {
               var ad_data = xr.compileVar(this.ad_get_itemkey)
@@ -1197,7 +1198,7 @@ export default class rw_xr {
       }
       case 'actor': {
         try {
-          data_now = new Actor(Data.actors[d_data.id])
+          data_now = Data.actors[d_data.id] ? new Actor(Data.actors[d_data.id]) : new Actor(Scene.binding?.actors.presets[d_data.id]?.data)
           data_now.talk = d_data.talk ? d_data.talk : false
         } catch (e) {
           new Error_xr("(解析)角色类型错误：", Event, e)
@@ -1605,10 +1606,5 @@ export default class rw_xr {
    */
   get_connect(tag) {
     return this.connect[tag] ? this.connect[tag] : -1
-  }
-  onStart() {
-    Scene.on("load", () => {
-      console.log(this.data)
-    })
   }
 }

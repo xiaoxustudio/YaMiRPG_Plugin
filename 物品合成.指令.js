@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-06 20:55:43
+ * @LastEditTime: 2023-11-07 20:06:39
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -12,25 +12,27 @@
 @link https://space.bilibili.com/291565199
 @desc 
 
-@option op {"add_merge","find_marge","get_margekey"}
-@alias 操作 {添加物品合成,查询指定id的合成表,获取合成属性}
+@option op {"add_merge","find_merge","get_mergekey","convert_item"}
+@alias 操作 {添加物品合成,查询指定id的合成表,获取合成属性,物品源数据转换}
+
+@variable-getter item_ori
+@alias 子项源数据
+@desc 合成表物品列表数据
+@cond op {"convert_item"}
 
 
-@string marge_name
+@string merge_name
 @alias 合成表名称
 @cond op {"add_merge"}
 
-@string[] left_list
-@alias 左列表
+@string[] item_list
+@alias 物品列表
 @cond op {"add_merge"}
 
-@string[] right_list
-@alias 右列表
+@option add_list_op {"all_equal","type_equal","id_equal","num_equal","no_process"}
+@alias 合成操作 {全等,类型相等,ID相等,数量全等,不处理}
 @cond op {"add_merge"}
-
-@option add_list_op {"lr_equal","type_equal","id_equal","num_equal","no_process"}
-@alias 合成操作 {左右全等,类型相等,ID相等,数量全等,不处理}
-@cond op {"add_merge"}
+@desc 影响是否可以合成指令
 
 @option add_out_op {"item","equip"}
 @alias 合成类型 {物品,装备}
@@ -45,21 +47,22 @@
 
 @string string_id
 @alias 物品字符串ID
-@cond op {"find_marge"}
+@cond op {"find_merge"}
+@desc 传入物品字符串ID（数组或字符串）
 
-@variable-getter marge_varobj
+@variable-getter merge_varobj
 @alias 合成表对象
 @desc 目标合成表对象
-@cond op {"get_margekey"}
+@cond op {"get_mergekey"}
 
-@option margekey_type {"list_op","left_list","right_list","is_mix","out_op"}
-@alias 获取 {合成操作,左物品列表,右物品列表,是否混合,合成类型}
-@cond op {"get_margekey"}
+@option mergekey_type {"merge_name","list_op","item_list","is_mix","out_op"}
+@alias 获取 {合成表名称,合成操作,物品列表,是否混合,合成类型}
+@cond op {"get_mergekey"}
 
 @variable-getter save_var
 @alias 保存到变量
 @desc 操作保存到变量
-@cond op {"find_marge","get_margekey"}
+@cond op {"find_merge","get_mergekey","convert_item"}
 
 */
 class xr {
@@ -307,9 +310,8 @@ class Error_xr {
   }
 }
 class Merge {
-  marge_name
-  left_list
-  right_list
+  merge_name
+  item_list
   is_mix
   list_op
   out_op
@@ -319,8 +321,7 @@ class Merge {
     }
   }
   is_complete() {
-    if(this.list_op == "no_process"){return false}
-    
+    if (this.list_op == "no_process") { return false }
   }
 }
 export default class Merge_System_xr {
@@ -338,26 +339,42 @@ export default class Merge_System_xr {
     switch (this.op) {
       case "add_merge": {
         try {
-          this.add_marge({
-            marge_name: xr.compileVar(this.marge_name),
+          this.add_merge({
+            merge_name: xr.compileVar(this.merge_name),
             list_op: this.add_list_op,
             is_mix: this.is_mix,
             out_op: this.add_out_op,
-            right_list: this.right_list,
-            left_list: this.left_list,
+            item_list: this.item_list,
           })
         } catch (e) {
           new Error_xr("添加任务出错", Event, e)
         }
         break
       }
-      case "find_marge": {
-        this.save_var?.set(this.find_marge(xr.compileVar(String(this.string_id).trim())))
+      case "find_merge": {
+        this.save_var?.set(this.find_merge(xr.compileVar(this.string_id) instanceof Array ? xr.compileVar(this.string_id) : xr.compileVar(String(this.string_id).trim())))
         break
       }
-      case "get_margekey": {
-        console.log(this.marge_varobj?.get())
-        this.save_var?.set(this.marge_varobj?.get()?.[this.margekey_type])
+      case "get_mergekey": {
+        this.save_var?.set(this.merge_varobj?.get()?.[this.mergekey_type])
+        break
+      }
+      case "convert_item": {
+        try {
+          let data = this.item_ori?.get()
+          switch (data.type) {
+            case "item":
+              data = new Item(Data.items[data.id])
+              break
+            case "equip":
+              console.log(data)
+              data = new Equipment(Data.equipments[data.id])
+              break
+          }
+          this.save_var?.set(data)
+        } catch (e) {
+          new Error_xr("转换子项错误", Event, e)
+        }
         break
       }
     }
@@ -407,7 +424,7 @@ export default class Merge_System_xr {
   }
   /**
    * @description: 添加合并表
-   * @param {*} marge_name
+   * @param {*} merge_name
    * @param {*} left_list
    * @param {*} right_list
    * @param {*} is_mix
@@ -415,13 +432,14 @@ export default class Merge_System_xr {
    * @param {*} out_op
    * @return {*}
    */
-  add_marge({ marge_name = "", left_list = [], right_list = [], is_mix = false, list_op, out_op }) {
+  add_merge({ merge_name = "", item_list = [], is_mix = false, list_op, out_op }) {
     // 解析任务物品
     let map_to = [
       "item", "skill", "equip"
     ]
     const compile_list = (item) => {
       // 编译物品列表
+      let first_type = undefined;
       let item_jx = []
       let reg_num = /^[0-9]+.?[0-9]*/
       let item_ex
@@ -435,6 +453,11 @@ export default class Merge_System_xr {
         if (map_to.includes(String(str_splice[0]).trim())) {
           // 检测物品和装备任务是否有效
           if (String(str_splice[0]).trim() == "item" || String(str_splice[0]).trim() == "equip") {
+            if (!first_type) {
+              first_type = String(str_splice[0]).trim()
+            }
+            // 判断当前是否开启混合
+            if (!is_mix && String(str_splice[0]).trim() != first_type) { return false }
             if (!reg_num.test(String(str_splice[2]).trim())) {
               continue
             }
@@ -445,14 +468,16 @@ export default class Merge_System_xr {
       return item_jx
     }
     // 编译输出
-    let left_compile = compile_list(left_list)
-    let right_compile = compile_list(right_list)
-    let all_task = new Merge({ marge_name, left_list: left_compile, right_list: right_compile, is_mix, list_op, out_op })
+    let itemlist_compile = compile_list(item_list)
+    if (!itemlist_compile) {
+      // 不进行添加
+      return false
+    }
+    let all_task = new Merge({ merge_name, item_list: itemlist_compile, is_mix, list_op, out_op })
     const compile_Map = (list) => {
       // 添加任务
       let is_find = this.data.findIndex(table => this.isEqual(table, all_task))
       if (is_find === -1) { this.data.push(all_task) }
-
       let index = this.data.findIndex(table => this.isEqual(table, all_task))
       // 添加映射
       for (let key in list) {
@@ -468,15 +493,28 @@ export default class Merge_System_xr {
         }
       }
     }
-    compile_Map([...left_compile, ...right_compile])
+    compile_Map(itemlist_compile)
   }
   /**
    * @description: 按照物品ID查询合成表
    * @param {*} id
    * @return {*}
    */
-  find_marge(id) {
+  find_merge(id) {
     let res = []
+    if (id instanceof Array) {
+      // 查找多组，并排除重复
+      let arr = [...new Set(id)]
+      for (let key in arr) {
+        if (this.idMap.hasOwnProperty(arr[key])) {
+          for (let i in this.idMap[arr[key]]) {
+            let item = this.idMap[arr[key]][i]
+            res.push(this.data[item])
+          }
+        }
+      }
+      return [...new Set(res)]
+    }
     if (this.idMap.hasOwnProperty(id)) {
       for (let i in this.idMap[id]) {
         let item = this.idMap[id][i]
@@ -486,7 +524,3 @@ export default class Merge_System_xr {
     return res
   }
 }
-
-
-
-

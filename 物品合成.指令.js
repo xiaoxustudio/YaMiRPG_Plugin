@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-07 20:06:39
+ * @LastEditTime: 2023-11-09 12:40:21
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -12,8 +12,22 @@
 @link https://space.bilibili.com/291565199
 @desc 
 
-@option op {"add_merge","find_merge","get_mergekey","convert_item"}
-@alias 操作 {添加物品合成,查询指定id的合成表,获取合成属性,物品源数据转换}
+物品合成插件，包括物品添加，物品属性随机，合成类型，混合合成等操作
+
+
+
+@option op {"add_merge","find_merge","get_mergekey","convert_item","can_merge"}
+@alias 操作 {添加物品合成,查询指定id的合成表,获取合成属性,物品源数据转换,是否可以合成}
+
+@variable-getter merge_obj_arr
+@alias 合成数据
+@desc 被合成的物品对象数据(数组)
+@cond op {"can_merge"}
+
+@variable-getter item_obj
+@alias 合成表对象
+@desc 合成表对象数据
+@cond op {"can_merge"}
 
 @variable-getter item_ori
 @alias 子项源数据
@@ -30,14 +44,23 @@
 @cond op {"add_merge"}
 
 @option add_list_op {"all_equal","type_equal","id_equal","num_equal","no_process"}
-@alias 合成操作 {全等,类型相等,ID相等,数量全等,不处理}
+@alias 判断操作 {全等,类型相等,ID相等,数量全等,不处理}
 @cond op {"add_merge"}
-@desc 影响是否可以合成指令
+@desc 影响是否可以合成指令（对比玩家库存）
 
 @option add_out_op {"item","equip"}
 @alias 合成类型 {物品,装备}
 @cond op {"add_merge"}
 
+@option inherit_type {"bj_attr","jj_attr","no_process"}
+@alias 继承类型 {并集属性,交集属性,不处理}
+@desc 影响输出合成出的物品属性数量
+@cond op {"add_merge"}
+
+@string[] put_list
+@alias 表达式列表
+@cond op {"add_merge"}
+@desc 通过表达式确定合成出的物品属性
 
 @boolean is_mix
 @alias 可混合合成
@@ -62,7 +85,7 @@
 @variable-getter save_var
 @alias 保存到变量
 @desc 操作保存到变量
-@cond op {"find_merge","get_mergekey","convert_item"}
+@cond op {"find_merge","get_mergekey","convert_item","can_merge"}
 
 */
 class xr {
@@ -76,7 +99,7 @@ class xr {
       `  |____/ \\__, | /_/ \\_\\__,_|_|  \\__,_|_| |_| \n` +
       `          __/ |                              \n` +
       `         |___/                               \n` +
-      "\n\n  任务系统  \n\n" +
+      "\n\n  物品合成系统  \n\n" +
       "🏠b站：https://space.bilibili.com/291565199\n\n" +
       "📞github：https://github.com/xiaoxustudio\n\n" +
       "🌒官网：www.xiaoxustudio.top\n\n"
@@ -345,6 +368,8 @@ export default class Merge_System_xr {
             is_mix: this.is_mix,
             out_op: this.add_out_op,
             item_list: this.item_list,
+            inherit_type: this.inherit_type,
+            put_list: this.put_list,
           })
         } catch (e) {
           new Error_xr("添加任务出错", Event, e)
@@ -362,16 +387,23 @@ export default class Merge_System_xr {
       case "convert_item": {
         try {
           let data = this.item_ori?.get()
-          switch (data.type) {
-            case "item":
-              data = new Item(Data.items[data.id])
-              break
-            case "equip":
-              console.log(data)
-              data = new Equipment(Data.equipments[data.id])
-              break
+          const a_to_b = (ori) => {
+            switch (ori.type) {
+              case "item":
+                return new Item(Data.items[ori.id])
+              case "equip":
+                return new Equipment(Data.equipments[ori.id])
+            }
           }
-          this.save_var?.set(data)
+          this.save_var?.set(a_to_b(data))
+        } catch (e) {
+          new Error_xr("转换子项错误", Event, e)
+        }
+        break
+      }
+      case "can_merge": {
+        try {
+          this.save_var?.set(this.can_merge(this.merge_obj_arr?.get(), this.item_obj?.get()))
         } catch (e) {
           new Error_xr("转换子项错误", Event, e)
         }
@@ -432,11 +464,41 @@ export default class Merge_System_xr {
    * @param {*} out_op
    * @return {*}
    */
-  add_merge({ merge_name = "", item_list = [], is_mix = false, list_op, out_op }) {
+  add_merge({ merge_name = "", item_list = [], put_list = [], is_mix = false, inherit_type, list_op, out_op }) {
     // 解析任务物品
     let map_to = [
       "item", "skill", "equip"
     ]
+    const complie_put = (list) => {
+      let all_list = []
+      for (let key in list) {
+        let item = list[key]
+        let matches = item.match(/\s*(.+)\s*:\s*(.+)\s*/)
+        try {
+          all_list.push({
+            type: "array",
+            arr: JSON.parse(xr.compileVar(matches[2]).trim()),
+          })
+        } catch (e) {
+          let sub_str = matches[2].trim()
+          if (/\s*(.+)\s*~\s*(.+)\s*/.test(sub_str)) {
+            let sub_match = sub_str.match(/\s*(.+)\s*~\s*(.+)\s*/)
+            all_list.push({
+              left: xr.compileVar(sub_match[1].trim()),
+              right: xr.compileVar(sub_match[2].trim()),
+              type: "range"
+            })
+          } else {
+            all_list.push({
+              val: xr.compileVar(sub_str),
+              type: "value",
+            })
+          }
+        }
+      }
+      return all_list
+    }
+    let putlist_compile = complie_put(put_list)
     const compile_list = (item) => {
       // 编译物品列表
       let first_type = undefined;
@@ -473,7 +535,7 @@ export default class Merge_System_xr {
       // 不进行添加
       return false
     }
-    let all_task = new Merge({ merge_name, item_list: itemlist_compile, is_mix, list_op, out_op })
+    let all_task = new Merge({ merge_name, item_list: itemlist_compile, is_mix, list_op, out_op, put_list: putlist_compile, inherit_type })
     const compile_Map = (list) => {
       // 添加任务
       let is_find = this.data.findIndex(table => this.isEqual(table, all_task))
@@ -522,5 +584,62 @@ export default class Merge_System_xr {
       }
     }
     return res
+  }
+  can_merge(merge_arr, table) {
+    if (!(merge_arr instanceof Array)) { return false }
+    const acp = {
+      merge_arr,
+      get: (id) => {
+        return merge_arr.filter((val, ind) => val.id === id ? val : undefined)?.[0]
+      },
+      count(id) {
+        const list = merge_arr.filter((val, ind) => val.id === id ? val : undefined)
+        if (!list) return 0
+        let count = 0
+        for (const goods of list) {
+          count += goods.quantity ?? 1
+        }
+        return count
+      },
+    }
+    if (table instanceof Merge) {
+      let map = {}
+      let compare_list = Array(table.item_list.length).fill(true)
+      let compare_list_sub = []
+      for (let key in table.item_list) {
+        let sub_item = table.item_list[key]
+        // 装备更新
+        if (!map.hasOwnProperty(sub_item.id)) {
+          let obj = acp.get(sub_item.id)
+          // 装备
+          if (obj instanceof Equipment) {
+            compare_list_sub.push(true)
+            map[sub_item.id] = acp.count(sub_item.id) - 1
+          } else if (obj instanceof Item) {
+            // 物品
+            if (num && num >= sub_item.num) {
+              num -= sub_item.num
+              compare_list_sub.push(true)
+            } else { compare_list_sub.push(false) }
+            // 映射
+            map[sub_item.id] = num
+          }
+        } else {
+          let num = map[sub_item.id]
+          if (num && num >= sub_item.num) {
+            num -= sub_item.num
+            compare_list_sub.push(true)
+          } else { compare_list_sub.push(false) }
+          // 映射
+          map[sub_item.id] = num
+        }
+      }
+      map = undefined
+      if (compare_list.length === compare_list_sub.length && compare_list.every((v, i) => v === compare_list_sub[i])) {
+        return true
+      } else {
+        return false
+      }
+    }
   }
 }

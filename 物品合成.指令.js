@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-09 21:40:08
+ * @LastEditTime: 2023-11-12 22:20:29
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -58,15 +58,21 @@ value支持：
 合成回调：
 1.@index：循环索引
 2.@result：对应合成数据对象
-3.@merge：最后合成的物品（只有最后一次循环才生成）
+3.@table：合成表对象
+4.@merge：最后合成的物品（只有最后一次循环才生成）
 
-@option op {"add_merge","find_merge","get_mergekey","convert_item","can_merge","merge_item"}
-@alias 操作 {添加物品合成,查询指定id的合成表,获取合成属性,物品源数据转换,是否可以合成,合成物品}
+@option op {"add_merge","find_merge","get_mergekey","convert_item","can_merge","reduce_merge","merge_item"}
+@alias 操作 {添加物品合成,查询指定id的合成表,获取合成属性,物品源数据转换,是否可以合成,减少物品（根据合成表）,合成物品}
+
+@actor-getter merge_actor
+@alias 减少的角色
+@desc 被减少的物品角色
+@cond op {"reduce_merge"}
 
 @variable-getter merge_obj_arr
 @alias 合成数据
 @desc 被合成的物品对象数据(数组)
-@cond op {"can_merge","merge_item"}
+@cond op {"can_merge","merge_item","reduce_merge"}
 
 @file event_call
 @filter event
@@ -76,12 +82,13 @@ value支持：
 合成回调：
 1.@index：循环索引
 2.@result：对应合成数据对象
-3.@merge：最后合成的物品（只有最后一次循环才生成）
+3.@table：合成表对象
+4.@merge：最后合成的物品（只有最后一次循环才生成）
 
 @variable-getter item_obj
 @alias 合成表对象
 @desc 合成表对象数据
-@cond op {"can_merge","merge_item"}
+@cond op {"can_merge","merge_item","reduce_merge"}
 
 @variable-getter item_ori
 @alias 子项源数据
@@ -459,7 +466,9 @@ export default class Merge_System_xr {
           const a_to_b = (ori) => {
             switch (ori.type) {
               case "item":
-                return new Item(Data.items[ori.id])
+                let it = new Item(Data.items[ori.id])
+                it.quantity = ori.num
+                return it
               case "equip":
                 return new Equipment(Data.equipments[ori.id])
             }
@@ -478,6 +487,14 @@ export default class Merge_System_xr {
         }
         break
       }
+      case "reduce_merge": {
+        try {
+          this.reduce_merge(this.merge_obj_arr?.get(), this.item_obj?.get(), this.merge_actor)
+        } catch (e) {
+          new Error_xr("减少合成物品错误", Event, e)
+        }
+        break
+      }
       case "merge_item": {
         try {
           let data = this.merge_obj_arr?.get()
@@ -487,6 +504,7 @@ export default class Merge_System_xr {
             if (commands) {
               const event = new EventHandler(commands)
               event.attributes["@result"] = data[i]
+              event.attributes["@table"] = this.item_obj?.get()
               event.attributes["@index"] = i
               if (i == data.length - 1) {
                 event.attributes["@merge"] = this.merge_call(this.item_obj?.get())
@@ -563,14 +581,16 @@ export default class Merge_System_xr {
       let all_list = []
       for (let key in list) {
         let item = list[key]
-        let matches = item.match(/\s*(.+)\s*:\s*(.+)\s*/)
+        let matches
         try {
+          matches = item.match(/\s*(.+)\s*:\s*\[\s*(.+)\s*\]\s*/)
           all_list.push({
             type: "array",
             key: xr.compileVar(matches[1].trim()),
-            arr: JSON.parse(xr.compileVar(matches[2]).trim()),
+            arr: JSON.parse(xr.compileVar("[" + matches[2] + "]").trim()),
           })
         } catch (e) {
+          matches = item.match(/\s*(.+)\s*:\s*(.+)\s*/)
           let sub_str = matches[2].trim()
           if (/\s*(.+)\s*~\s*(.+)\s*/.test(sub_str)) {
             let sub_match = sub_str.match(/\s*(.+)\s*~\s*(.+)\s*/)
@@ -583,7 +603,7 @@ export default class Merge_System_xr {
           } else {
             all_list.push({
               key: xr.compileVar(matches[1].trim()),
-              val: xr.compileVar(sub_str),
+              val: xr.compileVar(/\s*((?=\()\(?)\s*(.+)\s*((?=\))\)?)\s*/.test(sub_str.trim()) ? new Function("return " + xr.compileVar(sub_str.trim()))() : xr.compileVar(sub_str.trim())),
               type: "value",
             })
           }
@@ -742,6 +762,7 @@ export default class Merge_System_xr {
             compare_list_sub.push(true)
             map[sub_item.id] = acp.count(sub_item.id) - 1
           } else if (obj instanceof Item) {
+            let num = acp.count(sub_item.id)
             // 物品
             if (num && num >= sub_item.num) {
               num -= sub_item.num
@@ -774,12 +795,108 @@ export default class Merge_System_xr {
       }
     }
   }
+  reduce_merge(merge_arr, table, merge_actor) {
+    let aci = merge_actor?.inventory
+    if (!(merge_arr instanceof Array)) { return false }
+    const acp = {
+      merge_arr,
+      get: (id) => {
+        return merge_arr.filter((val, ind) => val.id === id ? val : undefined)?.[0]
+      },
+      count(id) {
+        const list = merge_arr.filter((val, ind) => val.id === id ? val : undefined)
+        if (!list) return 0
+        let count = 0
+        for (const goods of list) {
+          count += goods.quantity ?? 1
+        }
+        return count
+      },
+    }
+    if (table instanceof Merge) {
+      let map = {}
+      let compare_list_sub = []
+      for (let key in table.item_list) {
+        let sub_item = table.item_list[key]
+        let obj = acp.get(sub_item.id)
+        if (table.list_op == "no_process") {
+          if (obj instanceof Equipment) {
+            aci.deleteEquipment(sub_item.id)
+          }
+          if (obj instanceof Item) {
+            aci.decreaseItems(sub_item.id, sub_item.num)
+          }
+          map[sub_item.id] = true
+          continue
+        }
+        // 更新
+        if (!map.hasOwnProperty(sub_item.id)) {
+          // 判断操作
+          if (table.list_op == "id_equal" && (obj instanceof Equipment || obj instanceof Item)) {
+            if (obj instanceof Equipment) {
+              aci.deleteEquipment(sub_item.id)
+            }
+            if (obj instanceof Item) {
+              aci.decreaseItems(sub_item.id, sub_item.num)
+            }
+            map[sub_item.id] = true
+            continue
+          }
+          // 装备
+          if (obj instanceof Equipment) {
+            aci.deleteEquipment(sub_item.id)
+            map[sub_item.id] = acp.count(sub_item.id) - 1
+          } else if (obj instanceof Item) {
+            let num = acp.count(sub_item.id)
+            // 物品
+            if (num && num >= sub_item.num) {
+              num -= sub_item.num
+              aci.decreaseItems(sub_item.id, sub_item.num)
+            } else { compare_list_sub.push(false) }
+            // 映射
+            map[sub_item.id] = num
+          }
+        } else {
+          let num = map[sub_item.id]
+          // 判断操作
+          if (table.list_op == "id_equal" && (obj instanceof Equipment || obj instanceof Item)) {
+            if (obj instanceof Equipment) {
+              aci.deleteEquipment(sub_item.id)
+            }
+            if (obj instanceof Item) {
+              aci.decreaseItems(sub_item.id, sub_item.num)
+            }
+            map[sub_item.id] = true
+            continue
+          }
+          if (num && num >= sub_item.num) {
+            num -= sub_item.num
+            aci.decreaseItems(sub_item.id, sub_item.num)
+          } else { compare_list_sub.push(false) }
+          // 映射
+          map[sub_item.id] = num
+        }
+      }
+      map = undefined
+      if (compare_list_sub.length === 0) {
+        return true
+      } else {
+        return false
+      }
+    }
+  }
+  /**
+   * @description: 物品合成
+   * @param {*} merge_table
+   * @return {*}
+   */
   merge_call(merge_table) {
     if (merge_table) {
       let data = undefined
       switch (merge_table.out_op) {
         case "item": {
           data = new Item(merge_table.model)
+          data.quantity = 1
           break
         }
         case "equip": {
@@ -799,6 +916,7 @@ export default class Merge_System_xr {
         switch (node.type) {
           case "item": {
             s_data = new Item(Data.items[node.id])
+            s_data.quantity = node.num
             break
           }
           case "equip": {

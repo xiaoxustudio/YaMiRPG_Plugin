@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-16 16:25:49
+ * @LastEditTime: 2023-11-17 11:44:15
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -42,73 +42,58 @@ const xQuery = function (content) {
   return new xQuery.fn.init(content)
 }
 xQuery.fn = {
-  init: function (seletor) {
-    let elemMap = xQuery.fn.map()
-    if (typeof seletor === "string") {
-      let sp = []
-      // 解析对应索引属性
-      let s_token = xQuery.fn.parseTextUnits(seletor)
-      let nowui = UI.root
-      let child_nodes = []
-      // 查找
-      let index = 0
-      let _cacheFind = []
-      for (; ;) {
-        if (_cacheFind.indexOf(nowui.presetId) == -1) {
-          if (nowui.children.length > 0 && typeof s_token[index].type !== "undefined") {
-            // 有效节点且类型相等
-            const findChild = (node) => {
-              let arr = []
-              for (let i in node.children) {
-                let path_str = xQuery.fn.path(node.children[i], true)
-                let path_str1 = xQuery.fn.path(s_token, true)
-                if (String(path_str).includes(path_str1) && s_token[s_token.length - 1] && node.children[i] instanceof s_token[s_token.length - 1].type) {
-                  let attr = s_token[s_token.length - 1].attrs
-                  if (Object.keys(attr).length > 0) {
-                    let maptoAttr = xQuery.fn.mapAttr()
-                    let eval_str = ""
-                    for (let key in attr) {
-                      eval_str += "this['" + maptoAttr[key] + "']=='" + attr[key] + "'&&"
-                    }
-                    let str_str = "return " + eval_str.slice(0, eval_str.lastIndexOf("&&")) + " ? true : false"
-                    let res = new Function(str_str).bind(node.children[i])()
-                    if (res) {
-                      arr.push(node.children[i])
-                      _cacheFind.push(node.presetId)
-                    }
-                  } else {
-                    arr.push(node.children[i])
-                    _cacheFind.push(node.presetId)
-                  }
-                  index++
-                }
-                // 查找子节点
-                if (node.children[i].children.length > 0) {
-                  let find = findChild(node.children[i])
-                  if (find.length > 0) {
-                    arr = [...arr, ...find]
-                  }
-                }
-              }
-              return arr
-            }
-            let nodeChild = findChild(nowui)
-            if (nodeChild.length > 0) {
-              child_nodes = [...child_nodes, ...nodeChild]
-            }
+  init: function (selector) {
+    if (typeof selector !== "string") {
+      return this;
+    }
+    // 解析选择器
+    const s_token = xQuery.fn.parseTextUnits(selector);
+    const nowui = UI.root;
+    let child_nodes = [];
+    let index = 0;
+    let _cacheFind = new Set();
+    const findChild = (node) => {
+      let arr = [];
+      for (let i of Array.from(node.children)) {
+        const path_str = xQuery.fn.path(i, true);
+        const path_str1 = xQuery.fn.path(s_token, true);
+        if (
+          !_cacheFind.has(node.presetId) &&
+          String(path_str).includes(path_str1) &&
+          s_token[s_token.length - 1] &&
+          i instanceof s_token[s_token.length - 1].type
+        ) {
+          const attr = s_token[s_token.length - 1].attrs;
+          if (Object.keys(attr).length > 0 && Object.entries(attr).every(([key, value]) => i[xQuery.fn.mapAttr()[key]] === value)) {
+            arr.push(i);
+            _cacheFind.add(node.presetId);
+          } else if (Object.keys(attr).length == 0) {
+            arr.push(i);
+            _cacheFind.add(node.presetId);
+          } else {
+            _cacheFind.add(node.presetId);
           }
-          _cacheFind.push(nowui.presetId)
-        } else if (index >= sp.length) {
-          break
+          index++;
+        }
+        if (i.children.length > 0) {
+          arr.push(...findChild(i));
         }
       }
-      xQuery.fn.merge(this, child_nodes)
+      return arr;
+    };
+    while (index < s_token.length && !_cacheFind.has(nowui.presetId)) {
+      if (nowui.children.length > 0 && typeof s_token[index].type !== "undefined") {
+        let nodeChild = findChild(nowui);
+        child_nodes.push(...nodeChild);
+      }
+      _cacheFind.add(nowui.presetId);
     }
-    return this
+    xQuery.fn.merge(this, child_nodes);
+    return this;
   },
   parseTextUnits(text) {
     let words = [...text.split("")]
-    this.elemMap = xQuery.fn.map()
+    this.elemMap = xQuery.fn.mapElem()
     let arr_obj = []
     //定义基础的枚举
     let tokens = []
@@ -187,7 +172,7 @@ xQuery.fn = {
   parseTextChild(text) {
     let words = text.split("n")
     if (words.length <= 0 || !(/[n]/.test(text)) || !(/([0-9]+)?n([0-9]+)?/.test(text))) { return [] }
-    this.elemMap = xQuery.fn.map()
+    this.elemMap = xQuery.fn.mapElem()
     let left = 0
     if (/[0-9]+/.test(words[0])) {
       left = new Function("return " + words[0])()
@@ -215,7 +200,7 @@ xQuery.fn = {
     }
     return arr
   },
-  map(a = false) {
+  mapElem(a = false) {
     if (a) {
       return {
         ImageElement: "image",
@@ -297,8 +282,8 @@ xQuery.fn = {
     }
   },
   path: function (node, is_str = false) {
-    let elemMap = xQuery.fn.map(true)
-    let elemToMap = xQuery.fn.map()
+    let elemMap = xQuery.fn.mapElem(true)
+    let elemToMap = xQuery.fn.mapElem()
     let arr = []
     // 判断类型
     if (node instanceof Array) {
@@ -319,17 +304,17 @@ xQuery.fn = {
       return is_str ? arr.join(" ") : arr
     }
   },
-  getObjNum(t) {
+  getObjNum(t = this) {
     return Object.keys(t).filter(index => !isNaN(index))
   },
-  _UIPrototype(prototype, content, call_back = () => { }, scall_back = () => { }) {
+  _UIPrototype(prototype, content, content_call_back = () => { }, scall_back = () => { }) {
     const to_call = (con) => {
-      let res = call_back(con)
+      let res = content_call_back(con)
       if (res) { return res } else { return con }
     }
     content = to_call(content)
     let num = xQuery.fn.getObjNum(this)
-    let elemMap = xQuery.fn.map(true)
+    let elemMap = xQuery.fn.mapElem(true)
     if (content) {
       for (let i in num) {
         let na = this[i].constructor.name
@@ -355,7 +340,42 @@ xQuery.fn = {
       return str
     }
   },
-  _UIFunction(prototype, args, call_back = () => { }) {
+  _UIFunction(prototype, check_call = () => { return true }, is_childcall = false, ...args) {
+    let num = xQuery.fn.getObjNum(this)
+    let elemMap = xQuery.fn.mapElem(true)
+    const to_call = (node, prototype) => {
+      return arguments[1](node, prototype) ? true : false
+    }
+    const call_childfunc = (node) => {
+      for (let ik in node.children) {
+        if (typeof node.children[ik][prototype] === "function") {
+          if (arguments.length >= 3) {
+            if (!to_call(node.children[ik], prototype)) {
+              continue
+            }
+          }
+          node.children[ik][prototype](...args)
+        }
+      }
+    }
+    if (!prototype) { return false }
+    for (let i of num) {
+      if (this[i].constructor.name in elemMap && typeof this[i][prototype] === "function") {
+        // 判断是否子元素也要调用这个方法
+        if (arguments.length >= 2) {
+          if (arguments[1]) {
+            call_childfunc(this[i])
+          }
+        }
+        if (arguments.length >= 3) {
+          if (!to_call(this[i], prototype)) {
+            continue
+          }
+        }
+        // 最后父级元素执行这个方法
+        if (num.length > 0) { this[i][prototype](...args) } else { return this[i][prototype](...args) }
+      }
+    }
   },
   text(content) {
     return this._UIPrototype("content", content)
@@ -525,6 +545,31 @@ xQuery.fn = {
             }
           }
         }
+      }
+    }
+  },
+  hide() {
+    return this._UIFunction("hide", true)
+  },
+  show() {
+    return this._UIFunction("show", true)
+  },
+  toggle() {
+    this._UIFunction("show", (node, prototype) => {
+      if (node.visible) {
+        node.hide()
+      }
+      else if (!node.visible) {
+        node.show()
+      }
+      return false
+    }, true)
+  },
+  map(func) {
+    let num = xQuery.fn.getObjNum(this)
+    if (typeof func === "function") {
+      for (let i in num) {
+        func(this[i], parseInt(i))
       }
     }
   },

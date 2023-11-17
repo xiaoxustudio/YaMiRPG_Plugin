@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-17 11:44:15
+ * @LastEditTime: 2023-11-17 12:43:24
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -36,6 +36,10 @@ root: RootElement,
 字体: "font"、边框: "border"、
 ID: "ID"、方向: "direction"、
 显示: "display"、悬停图片: "hoverImage"
+
+目前支持的方法
+hide（隐藏）、show（显示）、toggle（显隐切换）、
+map（遍历）、on（监听事件）、off（取消监听）
 
 */
 const xQuery = function (content) {
@@ -572,6 +576,27 @@ xQuery.fn = {
         func(this[i], parseInt(i))
       }
     }
+  },
+  remove() {
+    return this._UIFunction("remove", true)
+  },
+  clear() {
+    return this._UIFunction("clear", true)
+  },
+  connect() {
+    return this._UIFunction("connect")
+  },
+  disconnect() {
+    return this._UIFunction("disconnect")
+  },
+  isVisible() {
+    return this._UIFunction("isVisible")
+  },
+  destroy() {
+    return this._UIFunction("destroy")
+  },
+  set(transformProps) {
+    return this._UIFunction("set", () => { return true }, false, transformProps)
   },
 }
 export default function () {

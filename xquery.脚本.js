@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-17 12:43:24
+ * @LastEditTime: 2023-11-21 18:16:55
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -12,7 +12,7 @@
 @link https://space.bilibili.com/291565199
 @desc 
 
-可快速选择UI
+可快速选择UI，使用链式来调用方法
 
 类型对应表：
 image: ImageElement,
@@ -27,7 +27,7 @@ window: WindowElement,
 container: ContainerElement,
 root: RootElement,
 
-目前支持的属性：
+目前支持的属性(属性基本都支持链式调用)：
 名称: "name"、内容: "content"、
 颜色: "color"、大小: "size"、
 垂直居中: "verticalAlign" 支持字符串：top、middle、bottom
@@ -38,8 +38,11 @@ ID: "ID"、方向: "direction"、
 显示: "display"、悬停图片: "hoverImage"
 
 目前支持的方法
-hide（隐藏）、show（显示）、toggle（显隐切换）、
+hide（隐藏）、show（显示）、toggle（显隐切换）
 map（遍历）、on（监听事件）、off（取消监听）
+set（设置位置）、clear（清楚所有子元素）、destroy（销毁）
+connect（连接）、disconnect（断开连接）、isVisible（是否隐藏）
+remove（移除）、fadeIn（淡入）、fadeOut（淡出）、fadeToggle（切换淡入淡出）
 
 */
 const xQuery = function (content) {
@@ -326,6 +329,7 @@ xQuery.fn = {
           this[i][prototype] = content
         }
       }
+      return this
     } else {
       let str = ""
       for (let i in num) {
@@ -598,6 +602,155 @@ xQuery.fn = {
   set(transformProps) {
     return this._UIFunction("set", () => { return true }, false, transformProps)
   },
+  fadeIn(dur) {
+    let num = this.getObjNum(this)
+    for (let nodeIndex in num) {
+      let node = this[nodeIndex]
+      const { updaters } = node
+      let transitions = updaters.get('xQuery_fadeIn')
+      const duration = dur || 1000 // 默认1秒
+      // 判断上次动画是否结束
+      // 没有就创建一个动画
+      if (!transitions) {
+        // 如果不存在过渡更新器列表，新建一个
+        transitions = node.xQuery_fadeIn = new ModuleList()
+        updaters.set('xQuery_fadeIn', transitions)
+      }
+      node.visible = true
+      let elapsed = 0
+      const easing = Easing.get("linear")
+      // 创建更新器并添加到过渡更新器列表中
+      const updater = transitions.add({
+        update: deltaTime => {
+          const length = transitions.length
+          // 等待上一个动画完成
+          if (length > 1 && transitions[length - 1] !== updater) {
+            return true
+          }
+          elapsed += deltaTime
+          const time = easing.map(elapsed / duration)
+          node.transform.opacity = 0 * (1 - time) + 1 * time
+          // 限制不透明度，不让它溢出
+          if (node.transform.opacity > 1) {
+            node.transform.opacity = 1
+            node.visible = true
+          }
+          if (node.transform.opacity <= 0) {
+            node.visible = false
+          }
+          node.resize()
+          // 如果过渡结束，延迟移除更新器
+          if (elapsed >= duration) {
+            Callback.push(() => {
+              transitions.remove(updater)
+              // 如果过渡更新器列表为空，删除它
+              if (transitions.length === 0) {
+                updaters.delete('xQuery_fadeIn')
+              }
+            })
+          }
+        }
+      })
+    }
+  },
+  fadeOut(dur) {
+    let num = this.getObjNum(this)
+    for (let nodeIndex in num) {
+      let node = this[nodeIndex]
+      const { updaters } = node
+      let transitions = updaters.get('xQuery_fadeOut')
+      const duration = dur || 1000 // 默认1秒
+      // 判断上次动画是否结束
+      // 没有就创建一个动画
+      if (!transitions) {
+        // 如果不存在过渡更新器列表，新建一个
+        transitions = node.xQuery_fadeOut = new ModuleList()
+        updaters.set('xQuery_fadeOut', transitions)
+      }
+      let elapsed = 0
+      const easing = Easing.get("linear")
+      // 创建更新器并添加到过渡更新器列表中
+      const updater = transitions.add({
+        update: deltaTime => {
+          const length = transitions.length
+          // 等待上一个动画完成
+          if (length > 1 && transitions[length - 1] !== updater) {
+            return true
+          }
+          elapsed += deltaTime
+          const time = easing.map(elapsed / duration)
+          node.transform.opacity = 1 * (1 - time) + 0 * time
+          if (node.transform.opacity > 1) {
+            node.transform.opacity = 1
+            node.visible = true
+          }
+          if (node.transform.opacity <= 0) {
+            node.visible = false
+          }
+          node.resize()
+          // 如果过渡结束，延迟移除更新器
+          if (elapsed >= duration) {
+            Callback.push(() => {
+              transitions.remove(updater)
+              // 如果过渡更新器列表为空，删除它
+              if (transitions.length === 0) {
+                updaters.delete('xQuery_fadeOut')
+              }
+            })
+          }
+        }
+      })
+    }
+  },
+  fadeToggle(dur) {
+    let num = this.getObjNum(this)
+    for (let nodeIndex in num) {
+      let node = this[nodeIndex]
+      const { updaters } = node
+      let transitions = updaters.get('xQuery_fadeToggle')
+      let duration = (dur || 1000) + 10 // 默认1秒
+      // 判断上次动画是否结束
+      // 没有就创建一个动画
+      if (!transitions) {
+        // 如果不存在过渡更新器列表，新建一个
+        transitions = node.xQuery_fadeToggle = new ModuleList()
+        updaters.set('xQuery_fadeToggle', transitions)
+      }
+      let elapsed = 0
+      // 创建更新器并添加到过渡更新器列表中
+      const updater = transitions.add({
+        update: deltaTime => {
+          const length = transitions.length
+          // 直接清楚上一个动画
+          if (length > 1 && transitions[length - 1] !== updater) {
+            transitions.delete(transitions[length - 1])
+          }
+          if (elapsed === 0) {
+            if (node.visible) {
+              // 隐藏
+              this.fadeOut(dur)
+            } else {
+              // 显示
+              this.fadeIn(dur)
+            }
+          }
+          elapsed += deltaTime
+          node.resize()
+          // 如果过渡结束，延迟移除更新器
+          if (elapsed >= duration) {
+            Callback.push(() => {
+              transitions.remove(updater)
+              // 如果过渡更新器列表为空，删除它
+              if (transitions.length === 0) {
+                updaters.delete('xQuery_fadeToggle')
+              }
+            })
+          }
+        }
+      })
+
+    }
+  }
 }
 export default function () {
   xQuery.fn.init.prototype = xQuery.fn;

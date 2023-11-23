@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-21 18:16:55
+ * @LastEditTime: 2023-11-22 12:56:08
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -616,7 +616,6 @@ xQuery.fn = {
         transitions = node.xQuery_fadeIn = new ModuleList()
         updaters.set('xQuery_fadeIn', transitions)
       }
-      node.visible = true
       let elapsed = 0
       const easing = Easing.get("linear")
       // 创建更新器并添加到过渡更新器列表中
@@ -624,8 +623,12 @@ xQuery.fn = {
         update: deltaTime => {
           const length = transitions.length
           // 等待上一个动画完成
-          if (length > 1 && transitions[length - 1] !== updater) {
+          if (transitions[length - 1] !== updater) {
             return true
+          }
+          // 首次运行
+          if(elapsed === 0){
+            node.visible = true
           }
           elapsed += deltaTime
           const time = easing.map(elapsed / duration)
@@ -674,8 +677,12 @@ xQuery.fn = {
         update: deltaTime => {
           const length = transitions.length
           // 等待上一个动画完成
-          if (length > 1 && transitions[length - 1] !== updater) {
+          if (transitions[length - 1] !== updater) {
             return true
+          }
+          // 首次运行
+          if(elapsed === 0){
+            node.visible = true
           }
           elapsed += deltaTime
           const time = easing.map(elapsed / duration)
@@ -722,7 +729,7 @@ xQuery.fn = {
         update: deltaTime => {
           const length = transitions.length
           // 直接清楚上一个动画
-          if (length > 1 && transitions[length - 1] !== updater) {
+          if (transitions[length - 1] !== updater) {
             transitions.delete(transitions[length - 1])
           }
           if (elapsed === 0) {
@@ -750,7 +757,7 @@ xQuery.fn = {
       })
 
     }
-  }
+  },
 }
 export default function () {
   xQuery.fn.init.prototype = xQuery.fn;

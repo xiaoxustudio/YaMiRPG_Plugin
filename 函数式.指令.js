@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-24 15:27:32
+ * @LastEditTime: 2023-11-24 20:44:45
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -298,26 +298,28 @@ function init(self) {
     for (let i in arr[0]) {
       let obj = JSON.parse(fs.readFileSync(arr[0][i]))
       if (obj.type === "common") {
-        let cmdf = obj.commands[0]
-        let params = cmdf.params
-        if (cmdf.id === SelfGUID() && params.op === "create") {
-          // 过滤存储
-          f_arr[0].push(arr[0][parseInt(i)])
-          f_arr[1].push(arr[1][parseInt(i)])
-          f_arr[2].push(arr[2][parseInt(i)])
-          // 编译事件和参数列表
-          params.func_name = params.func_name.trim()
-          if (!func_list.has(params.func_name)) {
-            let commands_set = {
-              "id": "script",
-              "params": {
-                "script": `if(!Event.hasOwnProperty('params')){ Event.params = func_list.obj["${params.func_name}"].params;Event.result = null}`
+        for (let i in obj.commands) {
+          let cmdf = obj.commands[i]
+          let params = cmdf.params
+          if (cmdf.id === SelfGUID() && params.op === "create") {
+            // 过滤存储
+            f_arr[0].push(arr[0][parseInt(i)])
+            f_arr[1].push(arr[1][parseInt(i)])
+            f_arr[2].push(arr[2][parseInt(i)])
+            // 编译事件和参数列表
+            params.func_name = params.func_name.trim()
+            if (!func_list.has(params.func_name)) {
+              let commands_set = {
+                "id": "script",
+                "params": {
+                  "script": `if(!Event.hasOwnProperty('params')){ Event.params = func_list.obj["${params.func_name}"].params;Event.result = null}`
+                }
               }
-            }
-            obj.commands.unshift(commands_set)
-            obj.commands = Command.compile(obj.commands)
-            func_list.add(params, cmdf.id, obj, f_arr[0].length - 1)
-          } else { console.error("\n存在重复函数式名称：" + params.func_name + "\n\n报错文件：" + arr[0][i]); throw new Error(""); }
+              obj.commands.unshift(commands_set)
+              obj.commands = Command.compile(obj.commands)
+              func_list.add(params, cmdf.id, obj, f_arr[0].length - 1)
+            } else { console.error("\n存在重复函数式名称：" + params.func_name + "\n\n报错文件：" + arr[0][i]); throw new Error(""); }
+          }
         }
       }
     }

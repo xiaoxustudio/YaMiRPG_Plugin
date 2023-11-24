@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-24 20:44:45
+ * @LastEditTime: 2023-11-24 21:04:28
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -47,6 +47,11 @@ key -> 设置或传入参数key的(默认)值为null （单独key）
 
 PS：当value为(value)格式时，会将value转换为js值
 可用<*:*>格式获取当前到参数列表里面
+
+@boolean is_share
+@alias 共享当前本地变量
+@cond op {"call"}
+@desc 共享当前的本地变量
 
 @variable-getter func_res_set
 @alias 函数返回存储
@@ -374,6 +379,7 @@ class Functions_xr {
             let res = this.func_res_set
             let event = new EventHandler(func_list.obj[this.func_name].obj.commands)
             event.params = p
+            event.inheritEventContext(Event)
             EventHandler.call(event, new ModuleList())
             if (event.complete) {
               res?.set(event.result)

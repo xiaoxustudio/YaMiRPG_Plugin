@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-24 21:04:28
+ * @LastEditTime: 2023-11-26 02:24:58
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 函数式.指令
-@version 1.0
+@version 1.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -30,12 +30,129 @@ PS：当value为(value)格式时，会将value转换为js值
 所有值默认值为null，对应事件指令的空值
 事件部分操作出错会有提示信息和事件文件的出错位置
 
+事件键值对应表：
+ update: '更新事件',
+  create: '创建事件',
+  autorun: '自动执行',
+  collision: '碰撞事件',
+  hittrigger: '击中触发器',
+  hitactor: '击中角色',
+  destroy: '销毁事件',
+  playerenter: '玩家进入',
+  playerleave: '玩家离开',
+  actorenter: '角色进入',
+  actorleave: '角色离开',
+  skillcast: '施放技能',
+  skilladd: '技能添加',
+  skillremove: '技能移除',
+  stateadd: '状态添加',
+  stateremove: '状态移除',
+  equipmentadd: '装备添加',
+  equipmentremove: '装备移除',
+  itemuse: '物品使用',
+  keydown: '键盘按下',
+  keyup: '键盘抬起',
+  mousedown: '鼠标按下',
+  mousedownLB: '左键按下',
+  mousedownRB: '右键按下',
+  mouseup: '鼠标抬起',
+  mouseupLB: '左键抬起',
+  mouseupRB: '右键抬起',
+  mousemove: '鼠标移动',
+  mouseenter: '鼠标进入',
+  mouseleave: '鼠标离开',
+  click: '鼠标点击',
+  doubleclick: '鼠标双击',
+  wheel: '滚轮滑动',
+  input: '输入事件',
+  focus: '获取焦点',
+  blur: '失去焦点',
+  destroy: '销毁事件',
+
 @option op {"create","call","set_return","get_param"}
 @alias 操作 {创建函数式,调用函数式,设置函数式返回值,获取参数值}
 
+@option call_op_sw {"common","scene","actor","skill","state","equip","item","light","elem"}
+@alias 事件类型 {普通函数式,场景,角色,技能,状态,装备,物品,光源,元素}
+@cond op {"call"}
+
+
+@string SceneEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"scene"}
+
+@actor-getter Actor
+@alias 角色
+@cond call_op_sw {"actor"}
+
+@string ActorEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"actor"}
+
+@skill-getter Skill
+@alias 技能
+@cond call_op_sw {"skill"}
+
+@string SkillEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"skill"}
+
+@state-getter State
+@alias 状态
+@cond call_op_sw {"state"}
+
+@string StateEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"state"}
+
+@equipment-getter Equipment
+@alias 装备
+@cond call_op_sw {"equip"}
+
+@string EquipmentEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"equip"}
+
+@item-getter Item
+@alias 物品
+@cond call_op_sw {"item"}
+
+@string ItemEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"item"}
+
+@light Light
+@alias 光源
+@cond call_op_sw {"light"}
+
+@string LightEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"light"}
+
+@element-getter element
+@alias 元素
+@cond call_op_sw {"elem"}
+
+@string ElementEvent
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_sw {"elem"}
+
+@string func_name_call
+@alias 函数名称
+@cond call_op_sw {"common"}
+@desc 函数名称，用于调用函数
+
 @string func_name
 @alias 函数名称
-@cond op {"create","call"}
+@cond op {"create"}
 @desc 函数名称，用于调用函数
 
 @string[] params
@@ -337,56 +454,307 @@ function SelfGUID() {
   function getException() { try { throw Error(''); } catch (err) { return err; } }
   return String(getException().stack).split("\n")[1].substring("at getException (").match(/[./]([0-9a-f]{16})\.\S+$/)[1].trim()
 }
-
+const TypeMap = {}
+const TypeMap_Ori = {
+  update: '更新事件',
+  create: '创建事件',
+  autorun: '自动执行',
+  collision: '碰撞事件',
+  hittrigger: '击中触发器',
+  hitactor: '击中角色',
+  destroy: '销毁事件',
+  playerenter: '玩家进入',
+  playerleave: '玩家离开',
+  actorenter: '角色进入',
+  actorleave: '角色离开',
+  skillcast: '施放技能',
+  skilladd: '技能添加',
+  skillremove: '技能移除',
+  stateadd: '状态添加',
+  stateremove: '状态移除',
+  equipmentadd: '装备添加',
+  equipmentremove: '装备移除',
+  itemuse: '物品使用',
+  keydown: '键盘按下',
+  keyup: '键盘抬起',
+  mousedown: '鼠标按下',
+  mousedownLB: '左键按下',
+  mousedownRB: '右键按下',
+  mouseup: '鼠标抬起',
+  mouseupLB: '左键抬起',
+  mouseupRB: '右键抬起',
+  mousemove: '鼠标移动',
+  mouseenter: '鼠标进入',
+  mouseleave: '鼠标离开',
+  click: '鼠标点击',
+  doubleclick: '鼠标双击',
+  wheel: '滚轮滑动',
+  input: '输入事件',
+  focus: '获取焦点',
+  blur: '失去焦点',
+  destroy: '销毁事件',
+}
+let key = Object.values(TypeMap_Ori)
+let val = Object.keys(TypeMap_Ori)
+for (let i in key) {
+  TypeMap[key[i]] = val[i]
+}
 class Functions_xr {
   onStart() {
     init(this)
     window.func_list = func_list
   }
+  compileParam(params) {
+    let p = {}
+    for (let i in params) {
+      let content = String(params[i]).trim()
+      if (/\s*([a-zA-Z0-9]+)\s*:\s*(.+)\s*/.test(content)) {
+        let res = content.match(/\s*([a-zA-Z0-9]+)\s*:\s*(.+)\s*/)
+        if (/\s*\(\s*(.+)\s*\)\s*/.test(res[2])) {
+          try {
+            let val = res[2].match(/\s*\(\s*(.+)\s*\)\s*/)[1]
+            if (typeof val === "object") { p[res[1]] = val }
+            else { p[res[1]] = new Function("return " + val)() }
+          } catch (e) {
+            console.error("编译参数列表错误")
+          }
+        } else {
+          let val = xr.compileVar(res[2])
+          p[res[1]] = val
+        }
+      } else if (/\s*[a-zA-Z0-9]+\s*/.test(content)) {
+        if (Object.keys(p).indexOf(content) === -1) {
+          p[content] = null
+        }
+      }
+    }
+    return p
+  }
+  compileType(type) {
+    type = String(type).trim()
+    type = TypeMap[type] || type
+    let stype = Enum.getValue(type) || type
+    return stype
+  }
   call() {
     switch (this.op) {
       case "call": {
-        if (func_list.has(this.func_name)) {
-          try {
-            let p = {}
-            for (let i in this.params) {
-              let content = String(this.params[i]).trim()
-              if (/\s*([a-zA-Z0-9]+)\s*:\s*(.+)\s*/.test(content)) {
-                let res = content.match(/\s*([a-zA-Z0-9]+)\s*:\s*(.+)\s*/)
-                if (/\s*\(\s*(.+)\s*\)\s*/.test(res[2])) {
-                  try {
-                    let val = res[2].match(/\s*\(\s*(.+)\s*\)\s*/)[1]
-                    if (typeof val === "object") { p[res[1]] = val }
-                    else { p[res[1]] = new Function("return " + val)() }
-                  } catch (e) {
-                    console.error("编译参数列表错误：" + this.func_name + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[this.func_name].index])
-                  }
-                } else {
-                  let val = xr.compileVar(res[2])
-                  p[res[1]] = val
+        switch (this.call_op_sw) {
+          case "common": {
+            if (func_list.has(this.func_name_call)) {
+              try {
+                let p = this.compileParam(this.params)
+                let res = this.func_res_set
+                let event = new EventHandler(func_list.obj[this.func_name].obj.commands)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                EventHandler.call(event, new ModuleList())
+                if (event.complete) {
+                  res?.set(event.result)
                 }
-              } else if (/\s*[a-zA-Z0-9]+\s*/.test(content)) {
-                if (Object.keys(p).indexOf(content) === -1) {
-                  p[content] = null
-                }
+              } catch (e) {
+                console.error("函数式事件调用失败：" + this.func_name_call + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[this.func_name_call].index])
+                throw e
               }
             }
-            let ori = {
-              attributes: Event.attributes,
-              index: Event.index,
-              cmd: Event.commands,
-            };
-            let res = this.func_res_set
-            let event = new EventHandler(func_list.obj[this.func_name].obj.commands)
-            event.params = p
-            event.inheritEventContext(Event)
-            EventHandler.call(event, new ModuleList())
-            if (event.complete) {
-              res?.set(event.result)
+            break
+          }
+          case "scene": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const type = this.compileType(this.SceneEvent)
+              let e_cmd = Scene.binding?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                EventHandler.call(event, Scene.binding?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("场景函数式事件调用失败：" + this.SceneEvent)
+              throw e
             }
-          } catch (e) {
-            console.error("函数式事件调用失败：" + this.func_name + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[this.func_name].index])
-            throw e
+            break
+          }
+          case "actor": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getActor = this.Actor
+              const type = this.compileType(this.ActorEvent)
+              let e_cmd = getActor?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerActor = getActor
+                event.selfVarId = getActor.selfVarId
+                EventHandler.call(event, getActor?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("角色函数式事件调用失败：" + this.ActorEvent)
+              throw e
+            }
+            break
+          }
+          case "skill": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.Skill
+              const actor = getObj.parent?.actor
+              const type = this.compileType(this.SkillEvent)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerSkill = getObj
+                event.triggerActor = actor
+                event.casterActor = actor
+                EventHandler.call(event, actor?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("技能函数式事件调用失败：" + this.SkillEvent)
+              throw e
+            }
+            break
+          }
+          case "state": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.State
+              const actor = getObj.parent?.actor
+              const caster = getObj.caster ?? undefined
+              const type = this.compileType(this.StateEvent)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerState = getObj
+                event.triggerActor = actor
+                event.casterActor = caster
+                EventHandler.call(event, getObj?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("技能函数式事件调用失败：" + this.SkillEvent)
+              throw e
+            }
+            break
+          }
+          case "equipment": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.Equipment
+              const actor = getObj.parent?.actor
+              const type = this.compileType(this.EquipmentEvent)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerActor = actor
+                event.triggerEquipment = getObj
+                EventHandler.call(event, actor?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("装备函数式事件调用失败：" + this.EquipmentEvent)
+              throw e
+            }
+            break
+          }
+          case "Item": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.Item
+              const actor = getObj.parent?.actor
+              const type = this.compileType(this.ItemEvent)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerActor = actor
+                event.triggerItem = getObj
+                EventHandler.call(event, actor?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("物品函数式事件调用失败：" + this.ItemEvent)
+              throw e
+            }
+            break
+          }
+          case "light": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.Light
+              const type = this.compileType(this.LightEvent)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerLight = getObj
+                event.selfVarId = getObj.selfVarId
+                EventHandler.call(event, getObj?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("物品函数式事件调用失败：" + this.LightEvent)
+              throw e
+            }
+            break
+          }
+          case "elem": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.Element
+              const type = this.compileType(this.ElementEvent)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.priority = true
+                event.bubble = true
+                event.triggerElement = getObj
+                EventHandler.call(event, getObj?.updaters)
+                if (event.complete) {
+                  res?.set(event.result)
+                }
+              }
+            } catch (e) {
+              console.error("物品函数式事件调用失败：" + this.ElementEvent)
+              throw e
+            }
+            break
           }
         }
         break

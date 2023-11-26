@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-26 20:29:20
+ * @LastEditTime: 2023-11-26 20:59:52
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -615,7 +615,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("场景函数式事件调用失败：" + this.SceneEvent)
+              console.error("场景函数式事件调用失败：" + this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori))
               throw e
             }
             break
@@ -639,7 +639,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("角色函数式事件调用失败：" + this.ActorEvent)
+              console.error("角色函数式事件调用失败：" + this.call_op_actor== "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori))
               throw e
             }
             break
@@ -675,7 +675,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("技能函数式事件调用失败：" + this.SkillEvent)
+              console.error("技能函数式事件调用失败：" + this.call_op_skill == "enum" ? this.compileType(this.SkillEvent) : this.compileType(this.SkillEvent_ori))
               throw e
             }
             break
@@ -712,7 +712,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("技能函数式事件调用失败：" + this.SkillEvent)
+              console.error("状态函数式事件调用失败：" + this.call_op_state == "enum" ? this.compileType(this.StateEvent) : this.compileType(this.StateEvent_ori))
               throw e
             }
             break
@@ -747,7 +747,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("装备函数式事件调用失败：" + this.EquipmentEvent)
+              console.error("装备函数式事件调用失败：" + this.call_op_equip == "enum" ? this.compileType(this.EquipmentEvent) : this.compileType(this.EquipmentEvent_ori))
               throw e
             }
             break
@@ -780,7 +780,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.ItemEvent)
+              console.error("物品函数式事件调用失败：" + this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori) )
               throw e
             }
             break
@@ -804,7 +804,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.LightEvent)
+              console.error("物品函数式事件调用失败：" + this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori))
               throw e
             }
             break
@@ -814,7 +814,7 @@ class Functions_xr {
               let p = this.compileParam(this.params)
               let res = this.func_res_set
               const getObj = this.Element
-              const type =this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)
+              const type = this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
@@ -829,7 +829,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.ElementEvent)
+              console.error("物品函数式事件调用失败：" + this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori))
               throw e
             }
             break

@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-26 02:24:58
+ * @LastEditTime: 2023-11-26 20:29:20
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -30,45 +30,6 @@ PS：当value为(value)格式时，会将value转换为js值
 所有值默认值为null，对应事件指令的空值
 事件部分操作出错会有提示信息和事件文件的出错位置
 
-事件键值对应表：
- update: '更新事件',
-  create: '创建事件',
-  autorun: '自动执行',
-  collision: '碰撞事件',
-  hittrigger: '击中触发器',
-  hitactor: '击中角色',
-  destroy: '销毁事件',
-  playerenter: '玩家进入',
-  playerleave: '玩家离开',
-  actorenter: '角色进入',
-  actorleave: '角色离开',
-  skillcast: '施放技能',
-  skilladd: '技能添加',
-  skillremove: '技能移除',
-  stateadd: '状态添加',
-  stateremove: '状态移除',
-  equipmentadd: '装备添加',
-  equipmentremove: '装备移除',
-  itemuse: '物品使用',
-  keydown: '键盘按下',
-  keyup: '键盘抬起',
-  mousedown: '鼠标按下',
-  mousedownLB: '左键按下',
-  mousedownRB: '右键按下',
-  mouseup: '鼠标抬起',
-  mouseupLB: '左键抬起',
-  mouseupRB: '右键抬起',
-  mousemove: '鼠标移动',
-  mouseenter: '鼠标进入',
-  mouseleave: '鼠标离开',
-  click: '鼠标点击',
-  doubleclick: '鼠标双击',
-  wheel: '滚轮滑动',
-  input: '输入事件',
-  focus: '获取焦点',
-  blur: '失去焦点',
-  destroy: '销毁事件',
-
 @option op {"create","call","set_return","get_param"}
 @alias 操作 {创建函数式,调用函数式,设置函数式返回值,获取参数值}
 
@@ -76,74 +37,153 @@ PS：当value为(value)格式时，会将value转换为js值
 @alias 事件类型 {普通函数式,场景,角色,技能,状态,装备,物品,光源,元素}
 @cond op {"call"}
 
+@option call_op_scene {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"scene"}
 
-@string SceneEvent
+@option SceneEvent_ori {"create","autorun"}
+@alias 事件键 {创建事件,自动执行}
+@desc 场景原生事件列表
+@cond call_op_scene {"ori"}
+
+@enum SceneEvent
+@filter scene-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"scene"}
+@cond call_op_scene {"enum"}
+
+@option call_op_actor {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"actor"}
 
 @actor-getter Actor
 @alias 角色
 @cond call_op_sw {"actor"}
 
-@string ActorEvent
+@option ActorEvent_ori {"create","autorun","collision","hittrigger","talk","level-up","death","drop"}
+@alias 事件键 {创建事件,自动执行,碰撞事件,击中触发器,对话事件,升级事件,死亡事件,掉落事件}
+@desc 角色原生事件列表
+@cond call_op_actor {"ori"}
+
+@enum ActorEvent
+@filter actor-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"actor"}
+@cond call_op_actor {"enum"}
+
+@option call_op_skill {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"skill"}
 
 @skill-getter Skill
 @alias 技能
 @cond call_op_sw {"skill"}
 
-@string SkillEvent
+@option SkillEvent_ori {"skillcast","skilladd","skillremove"}
+@alias 事件键 {施放技能,技能添加,技能移除}
+@desc 技能原生事件列表
+@cond call_op_skill {"ori"}
+
+@enum SkillEvent
+@filter skill-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"skill"}
+@cond call_op_skill {"enum"}
+
+@option call_op_state {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"state"}
 
 @state-getter State
 @alias 状态
 @cond call_op_sw {"state"}
 
-@string StateEvent
+@option StateEvent_ori {"stateadd","stateremove","autorun"}
+@alias 事件键 {添加状态,移除状态,自动执行}
+@desc 状态原生事件列表
+@cond call_op_state {"ori"}
+
+@enum StateEvent
+@filter state-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"state"}
+@cond call_op_state {"enum"}
+
+@option call_op_equip {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"equip"}
 
 @equipment-getter Equipment
 @alias 装备
 @cond call_op_sw {"equip"}
 
-@string EquipmentEvent
+@option EquipmentEvent_ori {"equipmentadd","equipmentremove","create"}
+@alias 事件键 {添加装备,移除装备,创建事件}
+@desc 装备原生事件列表
+@cond call_op_equip {"ori"}
+
+@enum EquipmentEvent
+@filter equipment-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"equip"}
+@cond call_op_equip {"enum"}
+
+@option call_op_item {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"item"}
 
 @item-getter Item
 @alias 物品
 @cond call_op_sw {"item"}
 
-@string ItemEvent
+@option ItemEvent_ori {"itemuse"}
+@alias 事件键 {使用物品}
+@desc 物品原生事件列表
+@cond call_op_item {"ori"}
+
+@enum ItemEvent
+@filter item-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"item"}
+@cond call_op_item {"enum"}
+
+@option call_op_light {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"light"}
 
 @light Light
 @alias 光源
 @cond call_op_sw {"light"}
 
-@string LightEvent
+@option LightEvent_ori {"autorun"}
+@alias 事件键 {自动执行}
+@desc 光源原生事件列表
+@cond call_op_light {"ori"}
+
+@enum LightEvent
+@filter light-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"light"}
+@cond call_op_light {"enum"}
+
+@option call_op_elem {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"elem"}
 
 @element-getter element
 @alias 元素
 @cond call_op_sw {"elem"}
 
-@string ElementEvent
+@option ElementEvent_ori {"keydown","keyup","mousedown","mousedownLB","mousedownRB","mouseup","mouseupLB","mouseupRB","mousemove","mouseenter","mouseleave","click","doubleclick","wheel","input","focus","blur","destroy"}
+@alias 事件键 {键盘按下,键盘抬起,鼠标按下,左键按下,右键按下,鼠标抬起,左键抬起,右键抬起,鼠标移动,鼠标进入,鼠标离开,鼠标点击,鼠标双击,滚轮滑动,输入事件,获取焦点,失去焦点,销毁事件}
+@desc 元素原生事件列表
+@cond call_op_elem {"ori"}
+
+@enum ElementEvent
+@filter element-event
 @alias 事件键
 @desc 填入相应的事件键值或中文事件名称
-@cond call_op_sw {"elem"}
+@cond call_op_elem {"enum"}
 
 @string func_name_call
 @alias 函数名称
@@ -531,9 +571,9 @@ class Functions_xr {
     return p
   }
   compileType(type) {
-    type = String(type).trim()
+    type = typeof type === "object" ? type : String(type).trim()
     type = TypeMap[type] || type
-    let stype = Enum.getValue(type) || type
+    let stype = Enum.getValue(type.id) || type
     return stype
   }
   call() {
@@ -550,7 +590,7 @@ class Functions_xr {
                 if (this.is_share) { event.inheritEventContext(Event) }
                 EventHandler.call(event, new ModuleList())
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               } catch (e) {
                 console.error("函数式事件调用失败：" + this.func_name_call + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[this.func_name_call].index])
@@ -563,7 +603,7 @@ class Functions_xr {
             try {
               let p = this.compileParam(this.params)
               let res = this.func_res_set
-              const type = this.compileType(this.SceneEvent)
+              const type = this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori)
               let e_cmd = Scene.binding?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
@@ -571,7 +611,7 @@ class Functions_xr {
                 if (this.is_share) { event.inheritEventContext(Event) }
                 EventHandler.call(event, Scene.binding?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -585,7 +625,7 @@ class Functions_xr {
               let p = this.compileParam(this.params)
               let res = this.func_res_set
               const getActor = this.Actor
-              const type = this.compileType(this.ActorEvent)
+              const type = this.call_op_actor== "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)
               let e_cmd = getActor?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
@@ -595,7 +635,7 @@ class Functions_xr {
                 event.selfVarId = getActor.selfVarId
                 EventHandler.call(event, getActor?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -610,9 +650,19 @@ class Functions_xr {
               let res = this.func_res_set
               const getObj = this.Skill
               const actor = getObj.parent?.actor
-              const type = this.compileType(this.SkillEvent)
+              const type = this.call_op_skill == "enum" ? this.compileType(this.SkillEvent) : this.compileType(this.SkillEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
+                switch (type) {
+                  case 'skilladd':
+                  case 'skillremove':
+                    EventManager.emit(type, null, {
+                      triggerSkill: getObj,
+                      triggerActor: actor,
+                      casterActor: actor,
+                    })
+                    break
+                }
                 const event = new EventHandler(e_cmd)
                 event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
@@ -621,7 +671,7 @@ class Functions_xr {
                 event.casterActor = actor
                 EventHandler.call(event, actor?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -637,9 +687,19 @@ class Functions_xr {
               const getObj = this.State
               const actor = getObj.parent?.actor
               const caster = getObj.caster ?? undefined
-              const type = this.compileType(this.StateEvent)
+              const type = this.call_op_state == "enum" ? this.compileType(this.StateEvent) : this.compileType(this.StateEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
+                switch (type) {
+                  case 'stateadd':
+                  case 'stateremove':
+                    EventManager.emit(type, null, {
+                      triggerState: getObj,
+                      triggerActor: actor,
+                      casterActor: caster,
+                    })
+                    break
+                }
                 const event = new EventHandler(e_cmd)
                 event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
@@ -648,7 +708,7 @@ class Functions_xr {
                 event.casterActor = caster
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -663,9 +723,19 @@ class Functions_xr {
               let res = this.func_res_set
               const getObj = this.Equipment
               const actor = getObj.parent?.actor
-              const type = this.compileType(this.EquipmentEvent)
+              const type = this.call_op_equip == "enum" ? this.compileType(this.EquipmentEvent) : this.compileType(this.EquipmentEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
+                switch (type) {
+                  case 'equipmentadd':
+                  case 'equipmentremove':
+                  case 'equipmentgain':
+                    EventManager.emit(type, null, {
+                      triggerActor: actor,
+                      triggerEquipment: getObj,
+                    })
+                    break
+                }
                 const event = new EventHandler(e_cmd)
                 event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
@@ -673,7 +743,7 @@ class Functions_xr {
                 event.triggerEquipment = getObj
                 EventHandler.call(event, actor?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -688,9 +758,17 @@ class Functions_xr {
               let res = this.func_res_set
               const getObj = this.Item
               const actor = getObj.parent?.actor
-              const type = this.compileType(this.ItemEvent)
+              const type = this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori) 
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
+                switch (type) {
+                  case 'itemgain':
+                    EventManager.emit(type, null, {
+                      triggerActor: actor,
+                      triggerItem: getObj,
+                    })
+                    break
+                }
                 const event = new EventHandler(e_cmd)
                 event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
@@ -698,7 +776,7 @@ class Functions_xr {
                 event.triggerItem = getObj
                 EventHandler.call(event, actor?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -712,7 +790,7 @@ class Functions_xr {
               let p = this.compileParam(this.params)
               let res = this.func_res_set
               const getObj = this.Light
-              const type = this.compileType(this.LightEvent)
+              const type = this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
@@ -722,7 +800,7 @@ class Functions_xr {
                 event.selfVarId = getObj.selfVarId
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {
@@ -736,7 +814,7 @@ class Functions_xr {
               let p = this.compileParam(this.params)
               let res = this.func_res_set
               const getObj = this.Element
-              const type = this.compileType(this.ElementEvent)
+              const type =this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
@@ -747,7 +825,7 @@ class Functions_xr {
                 event.triggerElement = getObj
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
-                  res?.set(event.result)
+                  res?.set(event.result || null)
                 }
               }
             } catch (e) {

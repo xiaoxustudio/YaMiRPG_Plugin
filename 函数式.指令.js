@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-27 12:51:16
+ * @LastEditTime: 2023-11-27 18:44:22
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 函数式.指令
-@version 1.1
+@version 1.2
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -21,7 +21,7 @@ key : value -> 设置或传入参数key的(默认)值为value
 key -> 设置或传入参数key的(默认)值为null （单独key）
 
 PS：当value为(value)格式时，会将value转换为js值
-可用<*:*>格式获取当前到参数列表里面
+可用<local||global:*>格式获取变量到参数列表里面
 
 调用函数式的参数列表同上
 
@@ -286,6 +286,8 @@ class xr {
     return json;
   }
   static get_global(str) {
+    let res = Variable.get(str)
+    if (res) { return res }
     for (let i in Variable.groups) {
       for (let k in Variable.groups[i]) {
         if (str == Variable.groups[i][k].name) {
@@ -571,8 +573,8 @@ class Functions_xr {
         let res = content.match(/\s*([a-zA-Z0-9]+)\s*:\s*(.+)\s*/)
         if (/\s*\(\s*(.+)\s*\)\s*/.test(res[2])) {
           try {
-            let val = res[2].match(/\s*\(\s*(.+)\s*\)\s*/)[1]
-            if (typeof val === "object") { p[res[1]] = val }
+            let val = xr.compileVar(res[2].match(/\s*\(\s*(.+)\s*\)\s*/)[1])
+            if (typeof val == "object") { p[res[1]] = val }
             else { p[res[1]] = new Function("return " + val)() }
           } catch (e) {
             console.error("编译参数列表错误")
@@ -607,7 +609,7 @@ class Functions_xr {
                 let event = new EventHandler(func_list.obj[this.func_name].obj.commands)
                 event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
-                EventHandler.call(event, new ModuleList())
+                EventHandler.call(event)
                 if (event.complete) {
                   res?.set(event.result || null)
                 }
@@ -634,7 +636,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("场景函数式事件调用失败：" + this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori))
+              console.error("场景函数式事件调用失败：" + (this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori)))
               throw e
             }
             break
@@ -658,7 +660,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("角色函数式事件调用失败：" + this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori))
+              console.error("角色函数式事件调用失败：" + (this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)))
               throw e
             }
             break
@@ -694,7 +696,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("技能函数式事件调用失败：" + this.call_op_skill == "enum" ? this.compileType(this.SkillEvent) : this.compileType(this.SkillEvent_ori))
+              console.error("技能函数式事件调用失败：" + (this.call_op_skill == "enum" ? this.compileType(this.SkillEvent) : this.compileType(this.SkillEvent_ori)))
               throw e
             }
             break
@@ -731,7 +733,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("状态函数式事件调用失败：" + this.call_op_state == "enum" ? this.compileType(this.StateEvent) : this.compileType(this.StateEvent_ori))
+              console.error("状态函数式事件调用失败：" + (this.call_op_state == "enum" ? this.compileType(this.StateEvent) : this.compileType(this.StateEvent_ori)))
               throw e
             }
             break
@@ -766,7 +768,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("装备函数式事件调用失败：" + this.call_op_equip == "enum" ? this.compileType(this.EquipmentEvent) : this.compileType(this.EquipmentEvent_ori))
+              console.error("装备函数式事件调用失败：" + (this.call_op_equip == "enum" ? this.compileType(this.EquipmentEvent) : this.compileType(this.EquipmentEvent_ori)))
               throw e
             }
             break
@@ -799,7 +801,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori))
+              console.error("物品函数式事件调用失败：" + (this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori)))
               throw e
             }
             break
@@ -823,7 +825,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori))
+              console.error("物品函数式事件调用失败：" + (this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)))
               throw e
             }
             break
@@ -848,7 +850,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori))
+              console.error("物品函数式事件调用失败：" + (this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)))
               throw e
             }
             break
@@ -872,7 +874,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("区域函数式事件调用失败：" + this.call_op_region == "enum" ? this.compileType(this.RegionEvent) : this.compileType(this.RegionEvent_ori))
+              console.error("区域函数式事件调用失败：" + (this.call_op_region == "enum" ? this.compileType(this.RegionEvent) : this.compileType(this.RegionEvent_ori)))
               throw e
             }
             break
@@ -885,10 +887,10 @@ class Functions_xr {
         break
       }
       case "get_param": {
-        if (Event.params.hasOwnProperty(this.param_name)) { this.func_params_get?.set(Event.params[this.param_name]) } else { console.warn("不存在参数：" + this.param_name) }
+        if (Event.params.hasOwnProperty(this.param_name)) { this.func_params_get?.set(Event.params[this.param_name]) } else { this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name) }
         break
       }
     }
-  };
+  }
 }
 export default Functions_xr

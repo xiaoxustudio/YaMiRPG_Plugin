@@ -608,7 +608,6 @@ class Functions_xr {
       case "call": {
         switch (this.call_op_sw) {
           case "common": {
-            console.error(func_list.MapTo)
             this.func_name_call = xr.compileVar(this.func_name_call.trim())
             if (func_list.has(this.func_name_call)) {
               try {
@@ -625,6 +624,9 @@ class Functions_xr {
                 console.error("函数式事件调用失败：" + this.func_name_call + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[this.func_name_call].index])
                 throw e
               }
+            } else {
+              console.error("似乎不存在函数式：" + this.func_name_call)
+              throw new Error("")
             }
             break
           }

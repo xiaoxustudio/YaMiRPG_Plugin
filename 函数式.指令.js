@@ -1,19 +1,18 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-27 18:44:22
+ * @LastEditTime: 2023-11-27 19:38:36
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 函数式.指令
-@version 1.2
+@version 1.3
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
 
 将事件函数化，可传参，调用，获取事件的返回值
-
 
 创建函数式：
 参数列表格式： 
@@ -21,7 +20,7 @@ key : value -> 设置或传入参数key的(默认)值为value
 key -> 设置或传入参数key的(默认)值为null （单独key）
 
 PS：当value为(value)格式时，会将value转换为js值
-可用<local||global:*>格式获取变量到参数列表里面
+可用<local||global:*>格式获取变量到参数列表里面，全局变量可输入ID
 
 调用函数式的参数列表同上
 
@@ -30,8 +29,13 @@ PS：当value为(value)格式时，会将value转换为js值
 所有值默认值为null，对应事件指令的空值
 事件部分操作出错会有提示信息和事件文件的出错位置
 
-@option op {"create","call","set_return","get_param"}
-@alias 操作 {创建函数式,调用函数式,设置函数式返回值,获取参数值}
+@option op {"create","call","get_param","set_return"}
+@alias 操作 {创建函数式,调用函数式,获取参数值,设置函数式返回值}
+@desc 
+创建函数式：创建可以调用的普通函数式（仅可在普通事件中使用）
+调用函数式：调用一个普通函数式或事件函数式
+获取参数值：取出存储在当前的事件的参数值（如果当前参数不存在则为null（空值））
+设置函数式返回值：设置函数式的返回值（如果当前返回值不存在则为null（空值））
 
 @option call_op_sw {"common","scene","actor","skill","state","equip","item","light","elem","region"}
 @alias 事件类型 {普通函数式,场景,角色,技能,状态,装备,物品,光源,元素,区域}
@@ -218,14 +222,16 @@ PS：当value为(value)格式时，会将value转换为js值
 @alias 参数列表
 @cond op {"create","call"}
 @desc 函数的参数列表
+参数列表格式： 
 key : value -> 设置或传入参数key的(默认)值为value
 key -> 设置或传入参数key的(默认)值为null （单独key）
 
 PS：当value为(value)格式时，会将value转换为js值
-可用<*:*>格式获取当前到参数列表里面
+可用<local||global:*>格式获取变量到参数列表里面，全局变量可输入ID
 
 @boolean is_share
 @alias 共享当前本地变量
+@default false
 @cond op {"call"}
 @desc 共享当前的本地变量
 
@@ -441,11 +447,11 @@ let func_list = {
       return_type: params.func_type,
       params: p,
       obj,
-      index: parseInt(index)
+      index: parseInt(index),
     }
   },
 }
-function init(self) {
+function init() {
   let arr = [
     [], // 原路径
     [], // 短路径
@@ -481,8 +487,8 @@ function init(self) {
     for (let i in arr[0]) {
       let obj = JSON.parse(fs.readFileSync(arr[0][i]))
       if (obj.type === "common") {
-        for (let i in obj.commands) {
-          let cmdf = obj.commands[i]
+        for (let k in obj.commands) {
+          let cmdf = obj.commands[k]
           let params = cmdf.params
           if (cmdf.id === SelfGUID() && params.op === "create") {
             // 过滤存储
@@ -495,7 +501,7 @@ function init(self) {
               let commands_set = {
                 "id": "script",
                 "params": {
-                  "script": `if(!Event.hasOwnProperty('params')){ Event.params = func_list.obj["${params.func_name}"].params;Event.result = null}`
+                  "script": `if(!Event.hasOwnProperty('params') || !Event.hasOwnProperty('result')){ Event.params = func_list.obj["${params.func_name}"].params;Event.result = null}`
                 }
               }
               obj.commands.unshift(commands_set)
@@ -561,8 +567,8 @@ for (let i in key) {
   TypeMap[key[i]] = val[i]
 }
 class Functions_xr {
-  onStart() {
-    init(this)
+  constructor() {
+    init()
     window.func_list = func_list
   }
   compileParam(params) {
@@ -602,12 +608,14 @@ class Functions_xr {
       case "call": {
         switch (this.call_op_sw) {
           case "common": {
+            console.error(func_list.MapTo)
+            this.func_name_call = xr.compileVar(this.func_name_call.trim())
             if (func_list.has(this.func_name_call)) {
               try {
                 let p = this.compileParam(this.params)
                 let res = this.func_res_set
-                let event = new EventHandler(func_list.obj[this.func_name].obj.commands)
-                event.params = p
+                let event = new EventHandler(func_list.obj[this.func_name_call].obj.commands)
+                if (Object.keys(p).length >= 1) { event.params = p } else { event.params = func_list.obj[this.func_name_call].params }
                 if (this.is_share) { event.inheritEventContext(Event) }
                 EventHandler.call(event)
                 if (event.complete) {
@@ -887,6 +895,7 @@ class Functions_xr {
         break
       }
       case "get_param": {
+        this.param_name = xr.compileVar(this.param_name)
         if (Event.params.hasOwnProperty(this.param_name)) { this.func_params_get?.set(Event.params[this.param_name]) } else { this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name) }
         break
       }

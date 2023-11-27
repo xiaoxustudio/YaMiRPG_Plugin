@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-26 20:59:52
+ * @LastEditTime: 2023-11-27 12:51:16
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -33,8 +33,8 @@ PS：当value为(value)格式时，会将value转换为js值
 @option op {"create","call","set_return","get_param"}
 @alias 操作 {创建函数式,调用函数式,设置函数式返回值,获取参数值}
 
-@option call_op_sw {"common","scene","actor","skill","state","equip","item","light","elem"}
-@alias 事件类型 {普通函数式,场景,角色,技能,状态,装备,物品,光源,元素}
+@option call_op_sw {"common","scene","actor","skill","state","equip","item","light","elem","region"}
+@alias 事件类型 {普通函数式,场景,角色,技能,状态,装备,物品,光源,元素,区域}
 @cond op {"call"}
 
 @option call_op_scene {"ori","enum"}
@@ -189,6 +189,25 @@ PS：当value为(value)格式时，会将value转换为js值
 @alias 函数名称
 @cond call_op_sw {"common"}
 @desc 函数名称，用于调用函数
+
+@option call_op_region {"ori","enum"}
+@alias 事件子分类 {原生事件,枚举事件}
+@cond call_op_sw {"region"}
+
+@region Region
+@alias 区域
+@cond call_op_sw {"region"}
+
+@option RegionEvent_ori {"autorun","playerenter","playerleave","actorenter","actorleave"}
+@alias 事件键 {自动执行,玩家进入,玩家离开,角色进入,角色离开}
+@desc 区域原生事件列表
+@cond call_op_region {"ori"}
+
+@enum RegionEvent
+@filter region-event
+@alias 事件键
+@desc 填入相应的事件键值或中文事件名称
+@cond call_op_region {"enum"}
 
 @string func_name
 @alias 函数名称
@@ -625,7 +644,7 @@ class Functions_xr {
               let p = this.compileParam(this.params)
               let res = this.func_res_set
               const getActor = this.Actor
-              const type = this.call_op_actor== "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)
+              const type = this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)
               let e_cmd = getActor?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
@@ -639,7 +658,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("角色函数式事件调用失败：" + this.call_op_actor== "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori))
+              console.error("角色函数式事件调用失败：" + this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori))
               throw e
             }
             break
@@ -758,7 +777,7 @@ class Functions_xr {
               let res = this.func_res_set
               const getObj = this.Item
               const actor = getObj.parent?.actor
-              const type = this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori) 
+              const type = this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 switch (type) {
@@ -780,7 +799,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori) )
+              console.error("物品函数式事件调用失败：" + this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori))
               throw e
             }
             break
@@ -830,6 +849,30 @@ class Functions_xr {
               }
             } catch (e) {
               console.error("物品函数式事件调用失败：" + this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori))
+              throw e
+            }
+            break
+          }
+          case "region": {
+            try {
+              let p = this.compileParam(this.params)
+              let res = this.func_res_set
+              const getObj = this.Region
+              const type = this.call_op_region == "enum" ? this.compileType(this.RegionEvent) : this.compileType(this.RegionEvent_ori)
+              let e_cmd = getObj?.events[type]
+              if (e_cmd) {
+                const event = new EventHandler(e_cmd)
+                event.params = p
+                if (this.is_share) { event.inheritEventContext(Event) }
+                event.triggerRegion = getObj
+                event.selfVarId = getObj.selfVarId
+                EventHandler.call(event, getObj?.updaters)
+                if (event.complete) {
+                  res?.set(event.result || null)
+                }
+              }
+            } catch (e) {
+              console.error("区域函数式事件调用失败：" + this.call_op_region == "enum" ? this.compileType(this.RegionEvent) : this.compileType(this.RegionEvent_ori))
               throw e
             }
             break

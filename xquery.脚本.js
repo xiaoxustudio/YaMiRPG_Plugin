@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-22 12:56:08
+ * @LastEditTime: 2023-11-29 13:55:55
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin Xquery
-@version 1.0
+@version 1.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -43,6 +43,22 @@ map（遍历）、on（监听事件）、off（取消监听）
 set（设置位置）、clear（清楚所有子元素）、destroy（销毁）
 connect（连接）、disconnect（断开连接）、isVisible（是否隐藏）
 remove（移除）、fadeIn（淡入）、fadeOut（淡出）、fadeToggle（切换淡入淡出）
+
+Ajax事件：
+$.ajax({
+  beforeSend: function(xhr){
+ // 处理在发送请求之前事件
+  },
+  error: function(error,xhr){
+ // 处理错误事件
+  },
+  success: function(xhr){
+ // 处理成功事件
+  },
+  complete: function(xhr){
+ // 处理完成事件
+  }
+});
 
 */
 const xQuery = function (content) {
@@ -627,7 +643,7 @@ xQuery.fn = {
             return true
           }
           // 首次运行
-          if(elapsed === 0){
+          if (elapsed === 0) {
             node.visible = true
           }
           elapsed += deltaTime
@@ -681,7 +697,7 @@ xQuery.fn = {
             return true
           }
           // 首次运行
-          if(elapsed === 0){
+          if (elapsed === 0) {
             node.visible = true
           }
           elapsed += deltaTime
@@ -758,6 +774,51 @@ xQuery.fn = {
 
     }
   },
+}
+xQuery.ajax = (obj) => {
+  if (typeof obj == "object") {
+    const xhr = new XMLHttpRequest()
+    try {
+      xhr.onreadystatechange = () => {
+        switch (xhr.readyState) {
+          case 1: {
+            // 发送send之前
+            if (obj.hasOwnProperty("beforeSend") && typeof obj.beforeSend == "function") {
+              obj.beforeSend(xhr)
+            }
+            break
+          }
+          case 2: {
+            // 已经调用 send()，但尚未接收到响应
+            if (obj.hasOwnProperty("send") && typeof obj.send == "function") {
+              obj.send(xhr)
+            }
+            break
+          }
+          case 3: {
+            // 已经接收到全部响应数据，而且已经可以在浏览器中使用了
+            if (obj.hasOwnProperty("complete") && typeof obj.complete == "function") {
+              obj.complete(xhr)
+            }
+            break
+          }
+        }
+        // 判断HTTP的状态码，判断xhr对象的status属性值是否在200到300之间（200-299 用于表示请求成功）
+        if (xhr.status >= 200 && xhr.status < 300 && xhr.readyState === 4) {
+          if (obj.hasOwnProperty("success") && typeof obj.success == "function") {
+            obj.success(xhr)
+          }
+        }
+      }
+      let url = obj.url || ""
+      xhr.open(obj.type || "GET", /([A-Za-z])+:\/\/(.+)+/.test(url) ? url : "http://" + url, true)
+      xhr.send(null)
+    } catch (e) {
+      if (obj.hasOwnProperty("error") && typeof obj.error == "function") {
+        obj.error(e,xhr)
+      }
+    }
+  }
 }
 export default function () {
   xQuery.fn.init.prototype = xQuery.fn;

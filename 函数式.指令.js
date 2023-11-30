@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-27 19:38:36
+ * @LastEditTime: 2023-11-30 23:12:33
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 函数式.指令
-@version 1.3
+@version 1.4
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -220,7 +220,7 @@ PS：当value为(value)格式时，会将value转换为js值
 
 @string[] params
 @alias 参数列表
-@cond op {"create","call"}
+@cond op {"create"}
 @desc 函数的参数列表
 参数列表格式： 
 key : value -> 设置或传入参数key的(默认)值为value
@@ -228,6 +228,18 @@ key -> 设置或传入参数key的(默认)值为null （单独key）
 
 PS：当value为(value)格式时，会将value转换为js值
 可用<local||global:*>格式获取变量到参数列表里面，全局变量可输入ID
+
+@string[] params_call
+@alias 参数列表
+@cond op {"call"}
+@desc 函数的参数列表
+参数列表格式： 
+key : value -> 设置或传入参数key的(默认)值为value
+key -> 设置或传入参数key的(默认)值为null （单独key）
+
+PS：当value为(value)格式时，会将value转换为js值
+可用<local||global:*>格式获取变量到参数列表里面，全局变量可输入ID
+
 
 @boolean is_share
 @alias 共享当前本地变量
@@ -273,6 +285,19 @@ class xr {
     } catch (e) {
       return false;
     }
+  }
+  static deepObject(obj) {
+    if (typeof obj !== "object") { return obj }
+    const newobj = Array.isArray(obj) ? [] : {}
+    Object.setPrototypeOf(newobj, Object.getPrototypeOf(obj))
+    for (let i in obj) {
+      if (typeof i === "object") {
+        newobj[i] = xr.deepObject(obj[i])
+      } else {
+        newobj[i] = obj[i]
+      }
+    }
+    return newobj
   }
   static convertToJSON(object) {
     let cache = [];
@@ -413,6 +438,8 @@ class xr {
 let func_list = {
   obj: {},
   MapTo: [],
+  run_params: [], // 临时ID运行存放
+  run_now_id: null,
   has(name) {
     if (Object.keys(func_list.obj).indexOf(name) !== -1) { return true }
     return false
@@ -501,7 +528,7 @@ function init() {
               let commands_set = {
                 "id": "script",
                 "params": {
-                  "script": `if(!Event.hasOwnProperty('params') || !Event.hasOwnProperty('result')){ Event.params = func_list.obj["${params.func_name}"].params;Event.result = null}`
+                  "script": `if(!Event.hasOwnProperty('result')){ Event.result = null}`
                 }
               }
               obj.commands.unshift(commands_set)
@@ -595,7 +622,7 @@ class Functions_xr {
         }
       }
     }
-    return p
+    return xr.deepObject(p)
   }
   compileType(type) {
     type = typeof type === "object" ? type : String(type).trim()
@@ -603,29 +630,40 @@ class Functions_xr {
     let stype = Enum.getValue(type.id) || type
     return stype
   }
+  insertParamsTrunk(data) {
+    let ind = func_list.run_params.length
+    func_list.run_params.push(data)
+    return ind
+  }
+  getParamsTrunk(index) {
+    return func_list.run_params[index]
+  }
   call() {
     switch (this.op) {
       case "call": {
         switch (this.call_op_sw) {
           case "common": {
-            this.func_name_call = xr.compileVar(this.func_name_call.trim())
-            if (func_list.has(this.func_name_call)) {
+            let obj_parent = xr.deepObject(this)
+            this.func_name_call = xr.compileVar(obj_parent.func_name_call.trim())
+            if (func_list.has(obj_parent.func_name_call)) {
               try {
-                let p = this.compileParam(this.params)
-                let res = this.func_res_set
-                let event = new EventHandler(func_list.obj[this.func_name_call].obj.commands)
-                if (Object.keys(p).length >= 1) { event.params = p } else { event.params = func_list.obj[this.func_name_call].params }
-                if (this.is_share) { event.inheritEventContext(Event) }
+                let p = this.compileParam(obj_parent.params_call)
+                func_list.run_now_id = this.insertParamsTrunk(p)
+                let res = obj_parent.func_res_set
+                let event = new EventHandler(func_list.obj[obj_parent.func_name_call].obj.commands)
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 EventHandler.call(event)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               } catch (e) {
-                console.error("函数式事件调用失败：" + this.func_name_call + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[this.func_name_call].index])
+                console.error("函数式事件调用失败：" + obj_parent.func_name_call + "\n\n报错文件：" + func_list.MapTo[0][func_list.obj[obj_parent.func_name_call].index])
                 throw e
               }
             } else {
-              console.error("似乎不存在函数式：" + this.func_name_call)
+              console.error("似乎不存在函数式：" + obj_parent.func_name_call)
               throw new Error("")
             }
             break
@@ -638,11 +676,12 @@ class Functions_xr {
               let e_cmd = Scene.binding?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 EventHandler.call(event, Scene.binding?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -660,13 +699,14 @@ class Functions_xr {
               let e_cmd = getActor?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerActor = getActor
                 event.selfVarId = getActor.selfVarId
                 EventHandler.call(event, getActor?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -695,7 +735,6 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerSkill = getObj
                 event.triggerActor = actor
@@ -703,6 +742,8 @@ class Functions_xr {
                 EventHandler.call(event, actor?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -732,7 +773,6 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerState = getObj
                 event.triggerActor = actor
@@ -740,6 +780,8 @@ class Functions_xr {
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -768,13 +810,14 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerActor = actor
                 event.triggerEquipment = getObj
                 EventHandler.call(event, actor?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -801,13 +844,14 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerActor = actor
                 event.triggerItem = getObj
                 EventHandler.call(event, actor?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -825,13 +869,14 @@ class Functions_xr {
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerLight = getObj
                 event.selfVarId = getObj.selfVarId
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -849,7 +894,6 @@ class Functions_xr {
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.priority = true
                 event.bubble = true
@@ -857,6 +901,8 @@ class Functions_xr {
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -874,13 +920,14 @@ class Functions_xr {
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                event.params = p
                 if (this.is_share) { event.inheritEventContext(Event) }
                 event.triggerRegion = getObj
                 event.selfVarId = getObj.selfVarId
                 EventHandler.call(event, getObj?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
+                  delete func_list.run_params[func_list.run_now_id]
+                  func_list.run_now_id = null
                 }
               }
             } catch (e) {
@@ -897,8 +944,12 @@ class Functions_xr {
         break
       }
       case "get_param": {
-        this.param_name = xr.compileVar(this.param_name)
-        if (Event.params.hasOwnProperty(this.param_name)) { this.func_params_get?.set(Event.params[this.param_name]) } else { this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name) }
+        if (func_list.run_now_id) { return false }
+        if (func_list.run_params[func_list.run_now_id]) {
+          this.func_params_get?.set(this.getParamsTrunk(func_list.run_now_id)[this.param_name])
+        } else {
+          this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name)
+        }
         break
       }
     }

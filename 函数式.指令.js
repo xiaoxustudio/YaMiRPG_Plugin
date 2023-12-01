@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-30 23:12:33
+ * @LastEditTime: 2023-12-01 08:33:58
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -648,7 +648,9 @@ class Functions_xr {
             if (func_list.has(obj_parent.func_name_call)) {
               try {
                 let p = this.compileParam(obj_parent.params_call)
-                func_list.run_now_id = this.insertParamsTrunk(p)
+                if(Object.keys(p).length > 0){
+                  func_list.run_now_id = this.insertParamsTrunk(p)
+                }else{func_list.run_now_id = this.insertParamsTrunk(func_list.obj[obj_parent.func_name_call].params)}
                 let res = obj_parent.func_res_set
                 let event = new EventHandler(func_list.obj[obj_parent.func_name_call].obj.commands)
                 if (obj_parent.is_share) { event.inheritEventContext(Event) }
@@ -671,6 +673,7 @@ class Functions_xr {
           case "scene": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const type = this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori)
               let e_cmd = Scene.binding?.events[type]
@@ -693,6 +696,7 @@ class Functions_xr {
           case "actor": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getActor = this.Actor
               const type = this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)
@@ -718,6 +722,7 @@ class Functions_xr {
           case "skill": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Skill
               const actor = getObj.parent?.actor
@@ -755,6 +760,7 @@ class Functions_xr {
           case "state": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.State
               const actor = getObj.parent?.actor
@@ -793,6 +799,7 @@ class Functions_xr {
           case "equipment": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Equipment
               const actor = getObj.parent?.actor
@@ -829,6 +836,7 @@ class Functions_xr {
           case "Item": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Item
               const actor = getObj.parent?.actor
@@ -863,6 +871,7 @@ class Functions_xr {
           case "light": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Light
               const type = this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)
@@ -880,7 +889,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + (this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)))
+              console.error("光源函数式事件调用失败：" + (this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)))
               throw e
             }
             break
@@ -888,6 +897,7 @@ class Functions_xr {
           case "elem": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Element
               const type = this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)
@@ -906,7 +916,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + (this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)))
+              console.error("元素函数式事件调用失败：" + (this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)))
               throw e
             }
             break
@@ -914,6 +924,7 @@ class Functions_xr {
           case "region": {
             try {
               let p = this.compileParam(this.params)
+              func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Region
               const type = this.call_op_region == "enum" ? this.compileType(this.RegionEvent) : this.compileType(this.RegionEvent_ori)
@@ -944,7 +955,7 @@ class Functions_xr {
         break
       }
       case "get_param": {
-        if (func_list.run_now_id) { return false }
+        if (func_list.run_now_id == null) { this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name);return false }
         if (func_list.run_params[func_list.run_now_id]) {
           this.func_params_get?.set(this.getParamsTrunk(func_list.run_now_id)[this.param_name])
         } else {

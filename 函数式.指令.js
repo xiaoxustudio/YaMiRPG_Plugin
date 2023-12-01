@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-12-01 08:33:58
+ * @LastEditTime: 2023-12-01 17:52:19
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -672,7 +672,7 @@ class Functions_xr {
           }
           case "scene": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const type = this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori)
@@ -695,7 +695,7 @@ class Functions_xr {
           }
           case "actor": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getActor = this.Actor
@@ -721,7 +721,7 @@ class Functions_xr {
           }
           case "skill": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Skill
@@ -759,7 +759,7 @@ class Functions_xr {
           }
           case "state": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.State
@@ -798,7 +798,7 @@ class Functions_xr {
           }
           case "equipment": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Equipment
@@ -835,7 +835,7 @@ class Functions_xr {
           }
           case "Item": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Item
@@ -870,7 +870,7 @@ class Functions_xr {
           }
           case "light": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Light
@@ -896,7 +896,7 @@ class Functions_xr {
           }
           case "elem": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Element
@@ -923,7 +923,7 @@ class Functions_xr {
           }
           case "region": {
             try {
-              let p = this.compileParam(this.params)
+              let p = this.compileParam(this.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
               let res = this.func_res_set
               const getObj = this.Region
@@ -956,7 +956,7 @@ class Functions_xr {
       }
       case "get_param": {
         if (func_list.run_now_id == null) { this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name);return false }
-        if (func_list.run_params[func_list.run_now_id]) {
+        if (func_list.run_params[func_list.run_now_id] && this.getParamsTrunk(func_list.run_now_id)) {
           this.func_params_get?.set(this.getParamsTrunk(func_list.run_now_id)[this.param_name])
         } else {
           this.func_params_get?.set(null); console.warn("当前事件不存在参数：" + this.param_name)

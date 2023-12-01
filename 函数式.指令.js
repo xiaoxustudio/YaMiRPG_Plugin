@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-12-01 17:52:19
+ * @LastEditTime: 2023-12-01 18:27:18
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
-@plugin 函数式.指令
-@version 1.4
+@plugin 函数式
+@version 1.5
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -174,7 +174,7 @@ PS：当value为(value)格式时，会将value转换为js值
 @alias 事件子分类 {原生事件,枚举事件}
 @cond call_op_sw {"elem"}
 
-@element-getter element
+@element-getter Element
 @alias 元素
 @cond call_op_sw {"elem"}
 
@@ -671,15 +671,16 @@ class Functions_xr {
             break
           }
           case "scene": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const type = this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori)
+              let res = obj_parent.func_res_set
+              const type = obj_parent.call_op_scene == "enum" ? this.compileType(obj_parent.SceneEvent) : this.compileType(obj_parent.SceneEvent_ori)
               let e_cmd = Scene.binding?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 EventHandler.call(event, Scene.binding?.updaters)
                 if (event.complete) {
                   res?.set(event.result || null)
@@ -688,22 +689,23 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("场景函数式事件调用失败：" + (this.call_op_scene == "enum" ? this.compileType(this.SceneEvent) : this.compileType(this.SceneEvent_ori)))
+              console.error("场景函数式事件调用失败：" + (obj_parent.call_op_scene == "enum" ? this.compileType(obj_parent.SceneEvent) : this.compileType(obj_parent.SceneEvent_ori)))
               throw e
             }
             break
           }
           case "actor": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getActor = this.Actor
-              const type = this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)
+              let res = obj_parent.func_res_set
+              const getActor = obj_parent.Actor
+              const type = obj_parent.call_op_actor == "enum" ? this.compileType(obj_parent.ActorEvent) : this.compileType(obj_parent.ActorEvent_ori)
               let e_cmd = getActor?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.triggerActor = getActor
                 event.selfVarId = getActor.selfVarId
                 EventHandler.call(event, getActor?.updaters)
@@ -714,19 +716,20 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("角色函数式事件调用失败：" + (this.call_op_actor == "enum" ? this.compileType(this.ActorEvent) : this.compileType(this.ActorEvent_ori)))
+              console.error("角色函数式事件调用失败：" + (obj_parent.call_op_actor == "enum" ? this.compileType(obj_parent.ActorEvent) : this.compileType(obj_parent.ActorEvent_ori)))
               throw e
             }
             break
           }
           case "skill": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getObj = this.Skill
+              let res = obj_parent.func_res_set
+              const getObj = obj_parent.Skill
               const actor = getObj.parent?.actor
-              const type = this.call_op_skill == "enum" ? this.compileType(this.SkillEvent) : this.compileType(this.SkillEvent_ori)
+              const type = obj_parent.call_op_skill == "enum" ? this.compileType(obj_parent.SkillEvent) : this.compileType(obj_parent.SkillEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 switch (type) {
@@ -740,7 +743,7 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.triggerSkill = getObj
                 event.triggerActor = actor
                 event.casterActor = actor
@@ -752,20 +755,21 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("技能函数式事件调用失败：" + (this.call_op_skill == "enum" ? this.compileType(this.SkillEvent) : this.compileType(this.SkillEvent_ori)))
+              console.error("技能函数式事件调用失败：" + (obj_parent.call_op_skill == "enum" ? this.compileType(obj_parent.SkillEvent) : this.compileType(obj_parent.SkillEvent_ori)))
               throw e
             }
             break
           }
           case "state": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getObj = this.State
+              let res = obj_parent.func_res_set
+              const getObj = obj_parent.State
               const actor = getObj.parent?.actor
               const caster = getObj.caster ?? undefined
-              const type = this.call_op_state == "enum" ? this.compileType(this.StateEvent) : this.compileType(this.StateEvent_ori)
+              const type = obj_parent.call_op_state == "enum" ? this.compileType(obj_parent.StateEvent) : this.compileType(obj_parent.StateEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 switch (type) {
@@ -779,7 +783,7 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.triggerState = getObj
                 event.triggerActor = actor
                 event.casterActor = caster
@@ -791,19 +795,20 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("状态函数式事件调用失败：" + (this.call_op_state == "enum" ? this.compileType(this.StateEvent) : this.compileType(this.StateEvent_ori)))
+              console.error("状态函数式事件调用失败：" + (obj_parent.call_op_state == "enum" ? this.compileType(obj_parent.StateEvent) : this.compileType(obj_parent.StateEvent_ori)))
               throw e
             }
             break
           }
           case "equipment": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getObj = this.Equipment
+              let res = obj_parent.func_res_set
+              const getObj = obj_parent.Equipment
               const actor = getObj.parent?.actor
-              const type = this.call_op_equip == "enum" ? this.compileType(this.EquipmentEvent) : this.compileType(this.EquipmentEvent_ori)
+              const type = obj_parent.call_op_equip == "enum" ? this.compileType(obj_parent.EquipmentEvent) : this.compileType(obj_parent.EquipmentEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 switch (type) {
@@ -817,7 +822,7 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.triggerActor = actor
                 event.triggerEquipment = getObj
                 EventHandler.call(event, actor?.updaters)
@@ -828,19 +833,20 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("装备函数式事件调用失败：" + (this.call_op_equip == "enum" ? this.compileType(this.EquipmentEvent) : this.compileType(this.EquipmentEvent_ori)))
+              console.error("装备函数式事件调用失败：" + (obj_parent.call_op_equip == "enum" ? this.compileType(obj_parent.EquipmentEvent) : this.compileType(obj_parent.EquipmentEvent_ori)))
               throw e
             }
             break
           }
           case "Item": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getObj = this.Item
+              let res = obj_parent.func_res_set
+              const getObj = obj_parent.Item
               const actor = getObj.parent?.actor
-              const type = this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori)
+              const type = obj_parent.call_op_item == "enum" ? this.compileType(obj_parent.ItemEvent) : this.compileType(obj_parent.ItemEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 switch (type) {
@@ -852,7 +858,7 @@ class Functions_xr {
                     break
                 }
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.triggerActor = actor
                 event.triggerItem = getObj
                 EventHandler.call(event, actor?.updaters)
@@ -863,22 +869,23 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("物品函数式事件调用失败：" + (this.call_op_item == "enum" ? this.compileType(this.ItemEvent) : this.compileType(this.ItemEvent_ori)))
+              console.error("物品函数式事件调用失败：" + (obj_parent.call_op_item == "enum" ? this.compileType(obj_parent.ItemEvent) : this.compileType(obj_parent.ItemEvent_ori)))
               throw e
             }
             break
           }
           case "light": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getObj = this.Light
-              const type = this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)
+              let res = obj_parent.func_res_set
+              const getObj = obj_parent.Light
+              const type = obj_parent.call_op_light == "enum" ? this.compileType(obj_parent.LightEvent) : this.compileType(obj_parent.LightEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.triggerLight = getObj
                 event.selfVarId = getObj.selfVarId
                 EventHandler.call(event, getObj?.updaters)
@@ -889,22 +896,23 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("光源函数式事件调用失败：" + (this.call_op_light == "enum" ? this.compileType(this.LightEvent) : this.compileType(this.LightEvent_ori)))
+              console.error("光源函数式事件调用失败：" + (obj_parent.call_op_light == "enum" ? this.compileType(obj_parent.LightEvent) : this.compileType(obj_parent.LightEvent_ori)))
               throw e
             }
             break
           }
           case "elem": {
+            let obj_parent = xr.deepObject(this)
             try {
-              let p = this.compileParam(this.params_call)
+              let p = this.compileParam(obj_parent.params_call)
               func_list.run_now_id = this.insertParamsTrunk(p)
-              let res = this.func_res_set
-              const getObj = this.Element
-              const type = this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)
+              let res = obj_parent.func_res_set
+              const getObj = obj_parent.Element
+              const type = obj_parent.call_op_elem == "enum" ? this.compileType(obj_parent.ElementEvent) : this.compileType(obj_parent.ElementEvent_ori)
               let e_cmd = getObj?.events[type]
               if (e_cmd) {
                 const event = new EventHandler(e_cmd)
-                if (this.is_share) { event.inheritEventContext(Event) }
+                if (obj_parent.is_share) { event.inheritEventContext(Event) }
                 event.priority = true
                 event.bubble = true
                 event.triggerElement = getObj
@@ -916,7 +924,7 @@ class Functions_xr {
                 }
               }
             } catch (e) {
-              console.error("元素函数式事件调用失败：" + (this.call_op_elem == "enum" ? this.compileType(this.ElementEvent) : this.compileType(this.ElementEvent_ori)))
+              console.error("元素函数式事件调用失败：" + (obj_parent.call_op_elem == "enum" ? this.compileType(obj_parent.ElementEvent) : this.compileType(obj_parent.ElementEvent_ori)))
               throw e
             }
             break

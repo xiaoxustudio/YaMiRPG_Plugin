@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-09-10 21:07:50
+ * @LastEditTime: 2023-12-02 11:04:56
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -76,7 +76,7 @@ Post使用注意：
 @cond web_op_root {"http_get","http_post"}
 
 
-@string save_var
+@variable-getter save_var
 @alias 存储到本地变量
 @cond web_op_root {"http_get","http_post"}
 
@@ -111,7 +111,7 @@ Post使用注意：
 @alias 操作 {取内容}
 @cond web_op_root {"parse_label"}
 
-@string parse_save_var
+@variable-getter parse_save_var
 @alias 存储到本地变量
 @cond web_op_root {"parse_label"}
 
@@ -180,23 +180,23 @@ Post使用注意：
 @cond lan_op_root {"local_server_listening"}
 
 
-@string server_save_var
+@@variable-getter server_save_var
 @alias 存储到本地变量
 @cond lan_op_root {"get_server_list"}
 
 
 
-@string parse_data_var
+@variable-getter parse_data_var
 @alias 解析的本地变量
 @cond parse_op_root {"parse_data"}
 
-@string parse_data_var_after
+@variable-getter parse_data_var_after
 @alias 解析后存储的本地变量
 @cond parse_op_root {"parse_data"}
 
 
 
-@string obj_save_var_before
+@variable-getter obj_save_var_before
 @alias 要取值本地变量
 @cond parse_op_root {"object_get_value"}
 
@@ -204,7 +204,7 @@ Post使用注意：
 @alias 取值表达式
 @cond parse_op_root {"object_get_value"}
 
-@string obj_save_var_after
+@variable-getter obj_save_var_after
 @alias 解析后存储的本地变量
 @cond parse_op_root {"object_get_value"}
 
@@ -222,7 +222,7 @@ class xr {
       `  |____/ \\__, | /_/ \\_\\__,_|_|  \\__,_|_| |_| \n` +
       `          __/ |                              \n` +
       `         |___/                               \n` +
-      "\n\n对象设置\n\n" +
+      "\n\n网络操作\n\n" +
       "🏠b站：https://space.bilibili.com/291565199\n\n" +
       "📞github：https://github.com/xiaoxustudio\n\n" +
       "🌒官网：www.xiaoxustudio.top\n\n"
@@ -363,9 +363,9 @@ class Server_xr {
   event_close;
   event_closed;
   constructor({ host, port, fum }) {
-    this.event = () => {};
-    this.connect_event = () => {};
-    this.event_close = () => {};
+    this.event = () => { };
+    this.connect_event = () => { };
+    this.event_close = () => { };
     this.event_closed = () => {
       const index = this.list.indexOf(this.socket);
       if (index !== -1) {
@@ -376,7 +376,7 @@ class Server_xr {
     this.server = net.createServer(fum);
     this.list = [];
     this.Master = net.Socket();
-    this.Master.connect(port, host, () => {});
+    this.Master.connect(port, host, () => { });
   }
   send(msg, id = null, event, type = "string") {
     console.log(msg);
@@ -471,8 +471,8 @@ class Client_xr {
   event;
   event_close;
   constructor({ host, port, fum }) {
-    this.event = () => {};
-    this.event_close = () => {};
+    this.event = () => { };
+    this.event_close = () => { };
     this.client = net.connect(port, host, () => {
       const commands = EventManager.guidMap[fum];
       if (commands) {
@@ -548,13 +548,13 @@ class Client_xr {
     this.client.destroy();
   }
 
-  n_server(fn = () => {}) {
+  n_server(fn = () => { }) {
     this.client.on("close", fn);
   }
-  dis_server(fn = () => {}) {
+  dis_server(fn = () => { }) {
     this.client.on("error", fn);
   }
-  receive_data(fn = () => {}) {
+  receive_data(fn = () => { }) {
     this.client.on("data", function (data) {
       fn.call(this, data);
     });
@@ -568,7 +568,12 @@ let local_client_object;
 export default class Http_Op {
   run({ url, type, svar, event, type_c }) {
     var xhr = new XMLHttpRequest();
-    xhr.open(type_c, url, false);
+    try {
+      xhr.open(type_c, url, false);
+    } catch (e) {
+      console.error("请尝试增加协议头")
+      throw e
+    }
     if (type_c == "POST") {
       let index = 0;
       for (let i = 0; i < Number(this.post_header.length / 2); i++) {
@@ -597,7 +602,7 @@ export default class Http_Op {
               doc = xhr.responseText;
               break;
           }
-          event.attributes[String(svar)] = doc;
+          svar?.set(doc)
         }
       }
     };
@@ -614,8 +619,8 @@ export default class Http_Op {
   }
   compile(r) {
     let commands = [...Event.commands];
-    commands.unshift(Command.compile(r, () => {})[0]);
-    let eh = new EventHandler(Command.compile(r, () => {}));
+    commands.unshift(Command.compile(r, () => { })[0]);
+    let eh = new EventHandler(Command.compile(r, () => { }));
     EventHandler.call(eh);
   }
 
@@ -628,51 +633,45 @@ export default class Http_Op {
     if (this.parse_wite) {
       // 等待
       while (running) {
-        if (event.attributes[rvar]) {
+        if (rvar) {
           let q = domparser.parseFromString(
-            event.attributes[rvar],
+            rvar?.get(),
             type == "html"
               ? "text/html"
               : type == "axmlx"
-              ? "application/xhtml+xml"
-              : type == "axml"
-              ? "application/xml"
-              : type == "xml"
-              ? "text/xml"
-              : "image/svg+xml"
+                ? "application/xhtml+xml"
+                : type == "axml"
+                  ? "application/xml"
+                  : type == "xml"
+                    ? "text/xml"
+                    : "image/svg+xml"
           );
           running = false;
-          if (event.attributes[svar]) {
-            delete event.attributes[svar];
-          }
-          event.attributes[svar] = q.querySelector(
+          svar?.set(q.querySelector(
             this.parse_identifiter
-          ).textContent;
+          ).textContent)
         }
       }
     } else {
       // 不等待
       let run_obj = setInterval(() => {
-        if (event.attributes[rvar]) {
+        if (rvar) {
           let q = domparser.parseFromString(
-            event.attributes[rvar],
+            rvar?.get(),
             type == "html"
               ? "text/html"
               : type == "axmlx"
-              ? "application/xhtml+xml"
-              : type == "axml"
-              ? "application/xml"
-              : type == "xml"
-              ? "text/xml"
-              : "image/svg+xml"
+                ? "application/xhtml+xml"
+                : type == "axml"
+                  ? "application/xml"
+                  : type == "xml"
+                    ? "text/xml"
+                    : "image/svg+xml"
           );
           running = false;
-          if (event.attributes[svar]) {
-            delete event.attributes[svar];
-          }
-          event.attributes[svar] = q.querySelector(
+          svar?.set(q.querySelector(
             this.parse_identifiter
-          ).textContent;
+          ).textContent)
           clearInterval(run_obj);
         }
       }, 1);
@@ -784,14 +783,14 @@ export default class Http_Op {
         });
       }
     });
-    local_client_object.n_server((a) => {});
+    local_client_object.n_server((a) => { });
   }
 
-  is_json(str){
+  is_json(str) {
     try {
       JSON.parse(str);
       return true;
-    } catch(e) {
+    } catch (e) {
       return false;
     }
   }
@@ -856,7 +855,7 @@ export default class Http_Op {
             if (local_server_object) {
               if (local_server_object.isListening()) {
                 setTimeout(() => {
-                  local_server_object.server.close((e) => {});
+                  local_server_object.server.close((e) => { });
                   local_server_object = null;
                 }, 1);
               }
@@ -889,8 +888,7 @@ export default class Http_Op {
             break;
           case "get_server_list":
             if (local_server_object) {
-              Event.attributes[String(this.server_save_var)] =
-                local_server_object.get_connectlist();
+              this.server_save_var?.set(local_server_object.get_connectlist())
             }
             break;
         }
@@ -898,26 +896,25 @@ export default class Http_Op {
       case "parse_op":
         switch (this.parse_op_root) {
           case "parse_data":
-            let data = Event.attributes[String(this.parse_data_var)];
+            let data = this.parse_data_var?.get()
             if (data && this.is_json(data)) {
-              let new_data = eval("("+data+")");
-              if(new_data.value){
+              let new_data = eval("(" + data + ")");
+              if (new_data.value) {
                 new_data.value = JSON.parse(new_data.value);
-              new_data.value = JSON.parse(new_data.value);
+                new_data.value = JSON.parse(new_data.value);
               }
-              Event.attributes[String(this.parse_data_var_after)] = new_data;
+              this.parse_data_var_after?.set(new_data)
             }
             break;
           case "object_get_value":
-            if (typeof Event.attributes[String(this.obj_save_var_before)] =="object") {
+            let put_value = this.obj_save_var_before?.get()
+            if (typeof put_value == "object") {
               let c_data = String(this.obj_save_var_expression).split(",");
               let is_start = true;
               let index = 0;
-              let put_value =
-                Event.attributes[String(this.obj_save_var_before)];
               while (is_start) {
                 if (c_data.length == index) {
-                  Event.attributes[String(this.obj_save_var_after)] = put_value;
+                  this.obj_save_var_after?.set(put_value)
                   is_start = false;
                   break;
                 } else {

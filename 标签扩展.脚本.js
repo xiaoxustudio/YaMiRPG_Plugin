@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-12-02 22:02:56
+ * @LastEditTime: 2023-12-02 22:08:22
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -122,7 +122,7 @@ export default class Talk_xr {
         let data = EventManager.guidMap[guid]
         if (data) {
           const event = new EventHandler(data)
-          if (match[2].trim() === "true") { event.inheritEventContext(Event) }
+          if (match[2] && match[2].trim() === "true") { event.inheritEventContext(Event) }
           EventHandler.call(event)
         }
         this.index += match[0].length

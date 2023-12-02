@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-12-02 22:08:22
+ * @LastEditTime: 2023-12-02 22:11:23
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -20,7 +20,7 @@ type取值:actor（角色）、item（物品）、equip（装备）、state（�
 
 【call】
 <call:id,不填 || true>
-调用事件，当第二个参数为true时，事件调用将共享本地变量
+调用普通事件，当第二个参数为true时，事件调用将共享本地变量
 
 【code】
 <code:...>

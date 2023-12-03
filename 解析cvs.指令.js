@@ -1,20 +1,19 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-12-03 15:50:16
+ * @LastEditTime: 2023-12-03 17:16:10
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 解析csv
-@version 1.15
+@version 1.5
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc
 
 用于解析csv内容
 解析的结果将会是数组
-目前不支持使用特殊字符："、,（英文）
 
 @option op {"read","parse","build","cover"}
 @alias 操作 {读取csv文件,解析csv内容,构建csv内容,覆盖csv文件}
@@ -61,17 +60,19 @@
 @cond op {"cover"}
 @desc 被覆盖的csv文件
 
-@option filter_type {"all","contain"}
-@alias 过滤规则 {过滤全部为空的行,过滤含有空的行}
+@option filter_type {"none","all","contain","all_c"}
+@alias 过滤规则 {不处理,过滤全部为空的行,过滤含有空的行,过滤含有空值的列}
 @cond op {"parse"}
 @desc 
-过滤全部为空的行：如果该行全部为空值，将被删除
-过滤含有空的行：如果该行有空值，将被删除
+不处理：不进行任何过滤
+过滤全部为空的行：如果该行全部为空值，此行将被删除
+过滤含有空的行：如果该行有空值，此行将被删除
+过滤含有空值的列：如果该列有空值，此列将被删除
 
 @variable-getter save_var
 @alias 保存到本地变量
 @cond op {"read","parse","build"}
-@desc 将结果保存道本地变量
+@desc 将结果保存到本地变量
 
 */
 const fs = require("fs")
@@ -246,62 +247,84 @@ class xr {
 export default class CSV_parse {
   parse(content, type = "all") {
     try {
-      let map_str = {
-        "#,": "，"
-      }
-      for (let i in map_str) {
-        content = content.replace(/(#,)/g, map_str[i])
-      }
-      const arr = content.split('\r\n');
-      let new_arr = []
-
-      // 首次解析,将每列提取出来
-      for (let i = 0; i < arr.length; i++) {
-        let item = arr[i].split(",")
-        new_arr[i] = item
-      }
-      // 字符串二次解析
-      let string_bool = false
-      let str = ""
-      let start = 0
-      let end = 0
-      for (let i = 0; i < new_arr.length; i++) {
-        // 解析每行
-        for (let ik = 0; ik < new_arr[i].length; ik++) {
-          let item = String(new_arr[i][ik])
-          if (item.startsWith("\"") && !string_bool) {
-            string_bool = true // 开启
-            start = ik
-          } else if (item.endsWith("\"") && string_bool) {
-            string_bool = false //关闭
-            end = ik
-            str += item.replace("\"", "")
-            str = str.replace("\t", ",").replace("\t", ",")
-            new_arr[i].splice(start, end, str)
-            str = ""
+      let arr_ori = content.split("")
+      let arr_after = []
+      let pin = []
+      let index = 0
+      let str_ss = ""
+      let is_runToZero = false
+      while (arr_ori.length >= 0) {
+        // 解决最后遗留
+        if (arr_ori.length == 0) {
+          if (is_runToZero) { break }
+          is_runToZero = true
+        }
+        // 解析
+        if (arr_ori[0] === "," && !str_ss.endsWith("\r\n")) {
+          // 生成列
+          if (str_ss.length == 0) {
+            pin.push("")
+          } else { pin.push(str_ss) }
+          str_ss = ""
+          index += 1
+          arr_ori.shift()
+        } else if (str_ss.endsWith("\r\n")) {
+          pin.push(str_ss.replace("\r\n", ""))
+          // 是否需要跳过本行
+          let is_skip = false
+          // 过滤
+          switch (type) {
+            case "all": {
+              let n_arr = Array(pin.length).fill("")
+              if (n_arr.join("") === pin.join("")) is_skip = true
+              break
+            }
+            case "contain": {
+              if (pin.includes("")) is_skip = true
+              break
+            }
           }
-          if (string_bool) {
-            if (item == "") {
-              str += ","
-            } else {
-              str += item.replace("\"", "") + "\t"
+          if (is_skip) { is_skip = false } else { arr_after.push(Object.assign([], pin)); }
+          // 生成行
+          pin = []
+          str_ss = ""
+          index += 1
+        } else if (arr_ori[0] === "\\") {
+          str_ss += arr_ori[0] + arr_ori[1]
+          arr_ori.shift()
+          arr_ori.shift()
+          index += 2
+        } else {
+          str_ss += arr_ori[0]
+          if (arr_ori[0] == "") { console.log("有空") }
+          index += 1
+          arr_ori.shift()
+        }
+      }
+      let need_remove_index = []
+      if (type == "all_c") {
+        for (let i = 0; i < arr_after.length; i++) {
+          for (let ik = 0; ik < arr_after[i].length; ik++) {
+            if (arr_after[i][ik] == "") {
+              need_remove_index.push(ik)
             }
           }
         }
-        // 过滤
-        switch (type) {
-          case "all": {
-            let n_arr = Array(new_arr[i].length).fill("")
-            if (n_arr.join("") === new_arr[i].join("")) new_arr.pop()
-            break
+        need_remove_index = [...new Set(need_remove_index)]
+        console.log(need_remove_index)
+        let now_remove = 0
+        while (need_remove_index.length > 0) {
+          now_remove = need_remove_index[0]
+          for (let id = 0; id < Object.assign([], arr_after).length; id++) {
+            delete arr_after[id][now_remove]
           }
-          case "contain": {
-            if (new_arr[i].includes("")) new_arr.pop()
-            break
-          }
+          need_remove_index.shift()
+        }
+        for (let id = 0; id < arr_after.length; id++) {
+          arr_after[id] = arr_after[id].filter(element => element !== undefined)
         }
       }
-      return new_arr
+      return arr_after
     } catch (e) {
       console.error("解析csv错误")
       throw e
@@ -352,7 +375,7 @@ export default class CSV_parse {
           switch (shell) {
             case 'electron': {
               const path = File.getPathByGUID(this.file_path_cover)
-              return fs.writeFileSync(__dirname+"\\"+path, data , {encoding : this.build_type})
+              return fs.writeFileSync(__dirname + "\\" + path, data, { encoding: this.build_type })
             }
             case 'web': {
               const key = this.file_path_cover + '.csv'

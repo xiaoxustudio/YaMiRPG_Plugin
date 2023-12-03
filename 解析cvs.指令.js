@@ -1,57 +1,77 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-12-03 15:34:20
+ * @LastEditTime: 2023-12-03 15:50:16
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 解析csv
-@version 1.1
+@version 1.15
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc
 
 用于解析csv内容
 解析的结果将会是数组
+目前不支持使用特殊字符："、,（英文）
 
 @option op {"read","parse","build","cover"}
 @alias 操作 {读取csv文件,解析csv内容,构建csv内容,覆盖csv文件}
+@desc 
+读取csv文件：读取指定文件的cvs内容（不会进行解析）
+解析csv内容：将指定变量的cvs内容解析为数组列表
+构建csv内容：将数组列表构建为cvs文本
+覆盖csv文件：将指定的cvs文件内容覆盖为指定cvs内容
 
 @file file_path
 @filter other
 @alias csv文件
 @cond op {"read"}
+@desc csv文件
 
 @option str_type {"utf-8","uff8","ascii","binary"}
 @alias 读取类型 {utf-8,uff8,ascii,binary}
 @cond op {"read"}
+@desc 读取类型，默认utf-8
+
+@option build_type {"utf-8","uff8","ascii","binary"}
+@alias 类型 {utf-8,uff8,ascii,binary}
+@cond op {"cover"}
+@desc 读取类型，默认utf-8
 
 @variable-getter str_content
 @alias csv内容
 @cond op {"parse"}
+@desc 需要解析的csv文本内容
 
 @variable-getter arr_content
 @alias csv内容
 @cond op {"build"}
+@desc 需要构建的csv文本内容
 
 @variable-getter cover_content
 @alias csv内容
 @cond op {"cover"}
+@desc 需要覆盖为的csv文本内容
 
 @file file_path_cover
 @filter other
 @alias 覆盖csv文件
 @cond op {"cover"}
+@desc 被覆盖的csv文件
 
 @option filter_type {"all","contain"}
 @alias 过滤规则 {过滤全部为空的行,过滤含有空的行}
 @cond op {"parse"}
-
+@desc 
+过滤全部为空的行：如果该行全部为空值，将被删除
+过滤含有空的行：如果该行有空值，将被删除
 
 @variable-getter save_var
 @alias 保存到本地变量
 @cond op {"read","parse","build"}
+@desc 将结果保存道本地变量
 
 */
 const fs = require("fs")
@@ -248,7 +268,7 @@ export default class CSV_parse {
       for (let i = 0; i < new_arr.length; i++) {
         // 解析每行
         for (let ik = 0; ik < new_arr[i].length; ik++) {
-          let item = new_arr[i][ik]
+          let item = String(new_arr[i][ik])
           if (item.startsWith("\"") && !string_bool) {
             string_bool = true // 开启
             start = ik
@@ -332,10 +352,7 @@ export default class CSV_parse {
           switch (shell) {
             case 'electron': {
               const path = File.getPathByGUID(this.file_path_cover)
-              const json = JSON.stringify(data, null, 2)
-              const fs = require('fs')
-              // 异步写入全局数据文件
-              return fs.writeFileSync(path, json)
+              return fs.writeFileSync(__dirname+"\\"+path, data , {encoding : this.build_type})
             }
             case 'web': {
               const key = this.file_path_cover + '.csv'

@@ -12,7 +12,6 @@
 @link https://space.bilibili.com/291565199
 @desc 
 
-
 【icon】
 <icon:id,type ?[,...（这里和image标签一样的用法）]>
 插入对象图标标签
@@ -32,7 +31,7 @@ export default class Talk_xr {
   onStart() {
     let ori_matchTag = Printer.prototype.matchTag
     Printer.prototype.matchTag = function () {
-      ori_matchTag.call(this)
+      if(ori_matchTag.call(this)){return true}
       const startIndex = this.index
       const endIndex = this.content.indexOf('>', startIndex + 1) + 1
       const string = this.content.slice(startIndex, endIndex)

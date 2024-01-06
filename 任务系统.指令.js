@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-05 23:10:56
+ * @LastEditTime: 2024-01-06 18:26:03
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 任务系统
-@version 1.4
+@version 1.5
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -210,10 +210,11 @@ value如果格式为(value)，则value的值将会被解析为js值
 @cond advanced_op {"get_taskkey","get_itemkey"}
 @desc 将操作的结果保存到变量
 
-@option base_op {"add","remove","get","set_default","get_default","change_next","check","check_list","check_list_com","is_complete"}
-@alias 子操作 {添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,任务完成物品列表遍历,任务是否可以完成}
+@option base_op {"load","add","remove","get","set_default","get_default","change_next","check","check_list","check_list_com","is_complete"}
+@alias 子操作 {加载任务文件,添加任务,删除任务,获取任务,设置当前任务,获取当前任务,切换到下一个任务,任务遍历,任务物品列表遍历,任务完成物品列表遍历,任务是否可以完成}
 @cond op {"base"}
 @desc
+加载任务文件：从任务文件加载任务
 添加任务：添加一个任务
 删除任务：删除一个任务
 获取任务：获取指定任务标识的任务
@@ -224,6 +225,11 @@ value如果格式为(value)，则value的值将会被解析为js值
 任务物品列表遍历：遍历任务数据的检查物品列表
 任务完成物品列表遍历：遍历任务数据的完成物品列表
 任务是否可以完成：检测任务是否满足完成的条件
+
+@string loadPath
+@alias 任务文件路径
+@cond base_op {"load"}
+@desc 任务数据文件路径的路径，可用变量、符号（$：表示当前项目）、资源GUID
 
 @string tag_rw
 @alias 任务标识
@@ -774,6 +780,26 @@ export default class rw_xr {
     switch (this.op) {
       case "base":
         switch (this.base_op) {
+          case "load": {
+            try {
+              // 同步读取存档数据文件
+              let p = xr.compileVar(this.loadPath)
+              const path = !/[a-f0-9]{8}/.test(p) && !/[a-f0-9]{16}/.test(p) ? File.route(p) : File.route(File.getPathByGUID(p))
+              const json = require('fs').readFileSync(path)
+              let res = JSON.parse(json)
+              this.current_rw = res.current
+              this.current_rw_branch = res.current_b
+              this._data = res._data
+              this._branch_data = res._branch_data
+              this.config = { ...res.config }
+              this.is_state = res.config["is_state"]
+              this._connect = res._connect
+              this._connect_branch = res._connect_branch
+              this.extend_struct = res.extend_struct
+            } catch (e) {
+              new Error_xr("（加载任务文件）加载任务文件出错：", Event, e)
+            }
+          }
           case "add":
             try {
               let _cache_obj = {}

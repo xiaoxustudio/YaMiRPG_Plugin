@@ -44,7 +44,7 @@ key = value 格式
 
 被暴露的对象会被存放到MOD_X.OBJ里面，可通过访问对象的方式访问
 
-
+PS：脚本可以是javaScript文件（.js）或者是事件文件（.event）
 
 @option op {"base_cmd", "run_cmd" , "config_cmd"}
 @alias MOD框架 {基础指令,运行指令, 配置指令}
@@ -74,11 +74,18 @@ key = value 格式
 @option run_cmd_list {"import_file","run_all_file","run_file_custom"}
 @alias 操作 {加载指定后缀文件,运行全部文件,运行指定文件}
 @cond op {"run_cmd"}
+@desc 
+加载指定后缀文件：加载.js或.event文件
+运行全部文件：运行加载的全部脚本文件
+运行指定文件：运行单个脚本文件
 
 @string import_file_path
 @alias 文件路径
 @cond run_cmd_list {"import_file"}
-
+@desc 
+# 指向当前Assets目录
+% 指向当前目录
+可用文件GUID
 
 
 
@@ -91,6 +98,8 @@ key = value 格式
 @string export_tag
 @alias 标识
 @cond base_cmd_list {"export_self"}
+@desc 
+标识重复会自动使用预设id当做标识
 
 @string save_var
 @alias 结果存储到变量
@@ -146,7 +155,13 @@ class xr {
     return te
   }
   static compiltePath(text) {
-    text = xr.compilteVar(text)
+    text = xr.compilteVar(text).trim()
+    let pre = File.getPathByGUID(text)
+    // 加载js文件
+    if (pre.length > 0) { return File.route(pre) }
+    // 加载event文件
+    pre = EventManager.get(text)
+    if (pre instanceof Array) { return [text, pre] }
     if (text.startsWith("$")) {
       text = text.slice(1, text.length)
       return File.route("Assets") + "\\" + text
@@ -569,10 +584,10 @@ class XR_Console {
 
 class MOD_X {
   script
-  debug
+  // debug
   constructor() {
     this.script = {}
-    this.debug = debug
+    // this.debug = debug
     window.MOD_X = this
   }
   expose(obj) {
@@ -596,7 +611,7 @@ class MOD_Manager {
     this.mod = new MOD_X()
     this.mod["OBJ"] = this.obj_list
     this.config = {
-      suffix: "js",
+      suffix: ["js", "event"],
       suffix_init: "init"
     }
     this.promise = new Promise((resolve, reject) => { resolve("ok") })
@@ -623,13 +638,16 @@ class MOD_Manager {
     return this.obj_list
   }
   loadfile(file) {
+    if (file instanceof Array) {
+      this.js_list[file[0]] = file[1]
+      return true
+    }
     let name_r = file.substring(String(file).lastIndexOf(".") + 1, file.length)
-    if (name_r === this.config.suffix) {
+    if (this.config.suffix.includes(name_r)) {
       try {
         this.js_list[file.substring(String(file).lastIndexOf("\\") + 1, file.length)] = new Function(this.next() + fs.readFileSync(file).toString("utf-8"))
         return true
-      }
-      catch (e) {
+      } catch (e) {
         console.log("脚本" + file.substring(String(file).lastIndexOf("\\") + 1, file.length) + "加载失败")
         debug.log("脚本" + file.substring(String(file).lastIndexOf("\\") + 1, file.length) + "加载失败")
         return false
@@ -640,13 +658,23 @@ class MOD_Manager {
   }
   next() {
     let a = `
-    console.log=(function (ori) {return function () { ori(...arguments);MOD_X.debug.log(...arguments);}})(console.log);eval = null;Function = null;
+    console.log=(function (ori) {return function () { ori(...arguments);
+      MOD_X.debug.log(...arguments);}})(console.log);eval = null;Function = null;
     `
-    return a.toString("utf-8")
+    return a.toString()
   }
   run() {
     for (let i in this.js_list) {
       this.promise.then((r) => {
+        if (/[0-9a-f]{16}/.test(i)) {
+          const commands = this.js_list[i]
+          if (commands) {
+            const event = new EventHandler(commands)
+            event.expose = this.mod.OBJ
+            EventHandler.call(event, Game.updaters)
+            return event
+          }
+        }
         return this.js_list[i].bind(this.mod).call(this.mod)
       }).catch((e) => {
         console.log("脚本:" + i + "执行错误，" + e)
@@ -690,7 +718,7 @@ class MOD_xr {
   }
 }
 
-const debug = new XR_Console()
+// const debug = new XR_Console()
 const MOD = new MOD_xr()
 
 
@@ -742,6 +770,15 @@ export default class XR_MOD_Pugin {
     }
   }
   onStart() {
+    window.on("keydown", (e) => {
+      switch (e.code) {
+        case 'F12':
+          if (!Stats.debug) {
+            require('electron').ipcRenderer.send('open-devTools')
+          }
+          break
+      }
+    })
   }
 }
 

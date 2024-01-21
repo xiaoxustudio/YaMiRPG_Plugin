@@ -21,10 +21,36 @@
 @desc 
 值反向：目标变量为true，则设置其为false，反之亦然
 
-@option str_op {"toupper","tolower","indexof","lastindexof","endwith","trim","u_create"}
-@alias 功能操作 {转换为大写字母,转换为小写字母,第一次出现的位置,最后一次出现的位置,结尾是否包含特定字符,去除全部空格,Unicode值序列创建字符串}
+@option str_op {"reg","toupper","tolower","indexof","lastindexof","endwith","trim","u_create"}
+@alias 功能操作 {正则匹配,转换为大写字母,转换为小写字母,第一次出现的位置,最后一次出现的位置,结尾是否包含特定字符,去除全部空格,Unicode值序列创建字符串}
 @cond op {"str"}
 
+@string reg_tag
+@alias 匹配标识
+@cond op {"str"}
+@desc
+g （全局匹配）
+找到所有的匹配，而不是在第一个匹配之后停止。
+
+i （忽略大小写）
+如果u标志也被启用，使用 Unicode 大小写折叠。
+
+m （多行匹配）
+将开始和结束字符 (^ and $) 视为在多行上工作。换句话说，匹配每一行的开头或结尾each line (由\n或者\r 分隔)，而不仅仅是整个输入字符串的开头或结尾。
+
+s （点号匹配所有字符）
+允许. 去匹配新的行
+
+u （unicode）
+将模式视为Unicode代码点的序列。(参见二进制字符串)。
+
+y （sticky，粘性匹配）
+只匹配目标字符串中由该正则表达式的lastIndex属性所指示的索引。不尝试从任何后面的索引进行匹配。
+
+@string regstr
+@alias 正则表达式
+@cond str_op {"reg"}
+@desc 正则表达式
 
 @option list_op {"unpop","pop","unshift","concat","reverse","slice"}
 @alias 功能操作 {移出第一项,移出最后一项,添加到列表开头,拼接两个列表,翻转列表,切割列表}
@@ -249,6 +275,15 @@ export default class TypeOp_xr {
       }
       case "str": {
         switch (this.str_op) {
+          case "reg":{
+            if (this.is_save) {
+              this.var_save?.set(String(this.var_target?.get()).match(new RegExp(this.regstr,this.reg_tag)))
+            } else {
+              this.var_target?.set(String(this.var_target?.get()).match(new RegExp(this.regstr,this.reg_tag)))
+              console.warn("设置不匹配类型，你应该另存一个数据")
+            }
+            break
+          }
           case "u_create": {
             if (this.is_save) {
               this.var_save?.set(String.fromCharCode(typeof this.var_num == "number" ? this.var_num : this.var_num?.get()))

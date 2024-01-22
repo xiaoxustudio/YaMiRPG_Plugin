@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-29 13:55:55
+ * @LastEditTime: 2024-01-22 16:18:26
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -43,6 +43,7 @@ map（遍历）、on（监听事件）、off（取消监听）
 set（设置位置）、clear（清楚所有子元素）、destroy（销毁）
 connect（连接）、disconnect（断开连接）、isVisible（是否隐藏）
 remove（移除）、fadeIn（淡入）、fadeOut（淡出）、fadeToggle（切换淡入淡出）
+noself（排除自身并返回当前的元素）
 
 Ajax事件：
 $.ajax({
@@ -66,11 +67,15 @@ const xQuery = function (content) {
 }
 xQuery.fn = {
   init: function (selector) {
+    if (selector instanceof Array) {
+      xQuery.fn.merge(this, selector);
+      return this;
+    }
     if (typeof selector !== "string") {
       return this;
     }
     // 解析选择器
-    const s_token = xQuery.fn.parseTextUnits(selector);
+    const s_token = xQuery.fn.parseTextUnits(selector)
     const nowui = UI.root;
     let child_nodes = [];
     let index = 0;
@@ -79,9 +84,11 @@ xQuery.fn = {
       let arr = [];
       for (let i of Array.from(node.children)) {
         const path_str = xQuery.fn.path(i, true);
+        const path_str_arr = path_str.split(" ")
         const path_str1 = xQuery.fn.path(s_token, true);
+        const path_str1_arr = path_str1.split(" ")
         if (
-          !_cacheFind.has(node.presetId) &&
+          !_cacheFind.has(i) &&
           String(path_str).includes(path_str1) &&
           s_token[s_token.length - 1] &&
           i instanceof s_token[s_token.length - 1].type
@@ -89,12 +96,12 @@ xQuery.fn = {
           const attr = s_token[s_token.length - 1].attrs;
           if (Object.keys(attr).length > 0 && Object.entries(attr).every(([key, value]) => i[xQuery.fn.mapAttr()[key]] === value)) {
             arr.push(i);
-            _cacheFind.add(node.presetId);
+            _cacheFind.add(i);
           } else if (Object.keys(attr).length == 0) {
             arr.push(i);
-            _cacheFind.add(node.presetId);
+            _cacheFind.add(i);
           } else {
-            _cacheFind.add(node.presetId);
+            _cacheFind.add(i);
           }
           index++;
         }
@@ -103,14 +110,12 @@ xQuery.fn = {
         }
       }
       return arr;
-    };
-    while (index < s_token.length && !_cacheFind.has(nowui.presetId)) {
-      if (nowui.children.length > 0 && typeof s_token[index].type !== "undefined") {
-        let nodeChild = findChild(nowui);
-        child_nodes.push(...nodeChild);
-      }
-      _cacheFind.add(nowui.presetId);
     }
+    if (nowui.children.length > 0 && typeof s_token[index].type !== "undefined") {
+      let nodeChild = findChild(nowui);
+      child_nodes.push(...nodeChild);
+    }
+    _cacheFind.add(nowui);
     xQuery.fn.merge(this, child_nodes);
     return this;
   },
@@ -618,6 +623,10 @@ xQuery.fn = {
   set(transformProps) {
     return this._UIFunction("set", () => { return true }, false, transformProps)
   },
+  noself() {
+    let _arr = Array.from(this).filter(val => val != Event.triggerElement)
+    return xQuery(_arr)
+  },
   fadeIn(dur) {
     let num = this.getObjNum(this)
     for (let nodeIndex in num) {
@@ -815,7 +824,7 @@ xQuery.ajax = (obj) => {
       xhr.send(null)
     } catch (e) {
       if (obj.hasOwnProperty("error") && typeof obj.error == "function") {
-        obj.error(e,xhr)
+        obj.error(e, xhr)
       }
     }
   }

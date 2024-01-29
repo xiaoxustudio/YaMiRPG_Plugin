@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-09-18 23:37:47
+ * @LastEditTime: 2024-01-29 14:04:07
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -26,7 +26,7 @@ $ ： 指向当前Assets文件夹
 @alias 文件路径
 @cond op {'read_file','write_file','exist_file','show_file'}
 
-@string show_save_var
+@variable-getter show_save_var
 @alias 保存变量
 @cond op {'show_file'}
 
@@ -41,7 +41,7 @@ $ ： 指向当前Assets文件夹
 @cond op {'read_file'}
 
 
-@string save_var
+@variable-getter save_var
 @alias 内容保存变量
 @cond op {'read_file'}
 
@@ -61,11 +61,11 @@ $ ： 指向当前Assets文件夹
 @cond op {'write_file'}
 
 
-@string save_res_var
+@variable-getter save_res_var
 @alias 写入结果变量
 @cond op {'write_file'}
 
-@string save_exist_var
+@variable-getter save_exist_var
 @alias 结果变量
 @cond op {'exist_file'}
 
@@ -178,30 +178,30 @@ class File_xr {
   }
 }
 
-export default class Plugin {
+export default class File_xr_once {
   call() {
     switch (this.op) {
       case "read_file":
         var data = File_xr.read(File_xr.compiltePath(this.file_path), this.op_encoding)
-        Event.attributes[this.save_var] = this.op_path_type == "txt" ? data : File_xr.is_json(data) ? JSON.parse(data) : data
+        this.save_var?.set(this.op_path_type == "txt" ? data : File_xr.is_json(data) ? JSON.parse(data) : data)
         break
       case "write_file":
         let res = File_xr.write(File_xr.compiltePath(this.file_path), File_xr.compilteVar(this.file_content), this.is_create ? true : false, this.is_append ? true : false, this.op_encoding)
-        Event.attributes[this.save_res_var] = res
+        this.save_res_var?.set(res)
         break
       case "exist_file":
-        Event.attributes[this.save_exist_var] = fs.existsSync(File_xr.compiltePath(this.file_path))
+        this.save_exist_var?.set(fs.existsSync(File_xr.compiltePath(this.file_path)))
         break
       case "show_file":
-        let file_item = fs.readdirSync(this.file_path)
+        let file_item = fs.readdirSync(File_xr.compiltePath(this.file_path))
         if (this.show_add_prefix) {
           let new_file_item = []
           for (let i of file_item) {
-            new_file_item.push(this.file_path + "\\" + i)
+            new_file_item.push(File_xr.compiltePath(this.file_path) + "\\" + i)
           }
           file_item = new_file_item
         }
-        Event.attributes[this.show_save_var] = file_item
+        this.show_save_var?.set(file_item)
         break
     }
   }

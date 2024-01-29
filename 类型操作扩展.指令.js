@@ -27,7 +27,7 @@
 
 @string reg_tag
 @alias 匹配标识
-@cond op {"str"}
+@cond str_op {"reg"}
 @desc
 g （全局匹配）
 找到所有的匹配，而不是在第一个匹配之后停止。

@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-11-05 16:14:57
+ * @LastEditTime: 2024-01-31 20:27:46
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -116,11 +116,11 @@ export default class Camera_limit_xr {
           texture.clipHeight = GL.height + et + eb
         }
 
-        // 设置光源渲染范围（限制在指定范围内）
-        Camera.lightLeft = Math.max(scrollLeft - texture.expansionLeft, limitLeft)
-        Camera.lightTop = Math.max(scrollTop - texture.expansionTop, limitTop)
-        Camera.lightRight = Math.min(scrollRight + texture.expansionRight, limitRight)
-        Camera.lightBottom = Math.min(scrollBottom + texture.expansionBottom, limitBottom)
+        // 设置光源渲染范围，还原
+        Camera.lightLeft = scrollLeft - texture.expansionLeft
+        Camera.lightTop = scrollTop - texture.expansionTop
+        Camera.lightRight = scrollRight + texture.expansionRight
+        Camera.lightBottom = scrollBottom + texture.expansionBottom
       }
     })
   }

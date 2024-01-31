@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2023-10-04 12:54:54
+ * @LastEditTime: 2024-01-31 21:36:11
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -31,7 +31,7 @@
 @default false
 @cond op {"generateMixed"}
 
-@string save_var
+@variable-getter save_var
 @alias 存储变量
 
 
@@ -104,16 +104,16 @@ export default class generate_random_xr {
   call() {
     switch (this.op) {
       case "generate48":
-        Event.attributes[this.save_var] = generate48()
+        this.save_var?.set(generate48())
         break
       case "generate96":
-        Event.attributes[this.save_var] = generate96()
+        this.save_var?.set(generate96())
         break
       case "generateMixed":
-        Event.attributes[this.save_var] = generateMixed(this.n_bit,this.sub_alpha)
+        this.save_var?.set(generateMixed(this.n_bit, this.sub_alpha))
         break
       case "randomNum":
-        Event.attributes[this.save_var] = randomNum(this.n_bit)
+        this.save_var?.set(randomNum(this.n_bit))
         break
     }
   }

@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2024-01-06 18:26:03
+ * @LastEditTime: 2024-02-23 08:58:11
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 任务系统
-@version 1.5
+@version 1.5.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -561,7 +561,7 @@ class Error_xr {
           _obj = _obj["parent"]
         }
       } catch (e) {
-        console.log(e.message)
+        console.error(e.message)
       }
     } else if (event.hasOwnProperty("triggerActor")) {
       let lex = "triggerActor"
@@ -585,7 +585,7 @@ class Error_xr {
       let lex = "triggerLight"
       str = "光源 " + event[lex].attributes[Map[lex]]
     }
-    console.log(msg, "\n", str, "\n", event)
+    console.error(msg, "\n", str, "\n", event)
     throw e
   }
 }
@@ -785,6 +785,7 @@ export default class rw_xr {
               // 同步读取存档数据文件
               let p = xr.compileVar(this.loadPath)
               const path = !/[a-f0-9]{8}/.test(p) && !/[a-f0-9]{16}/.test(p) ? File.route(p) : File.route(File.getPathByGUID(p))
+              console.log(path)
               const json = require('fs').readFileSync(path)
               let res = JSON.parse(json)
               this.current_rw = res.current

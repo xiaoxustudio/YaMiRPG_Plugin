@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2024-06-02 13:55:23
+ * @LastEditTime: 2024-06-03 00:41:40
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 文件操作
-@version 1.1
+@version 1.2
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc
@@ -20,17 +20,29 @@ $ ： 指向当前Assets文件夹
 PS：可用GUID判断文件是否存在
 PS：我们统一用的是/作为路径分割符
 
-@option op {'read_file','write_file','exist_file','is_directory','show_file'}
-@alias 操作 {读取文件,写入文件,文件是否存在,是否是目录,列出目录}
+@option op {'read_file','write_file','exist_file','is_directory','show_file','rename','delete'}
+@alias 操作 {读取文件,写入文件,文件是否存在,是否是目录,列出目录,重命名文件/文件夹,删除文件/文件夹}
 
 @string file_path
 @alias 文件路径
-@cond op {'read_file','write_file','exist_file','show_file','is_directory'}
+@cond op {'read_file','write_file','exist_file','show_file','is_directory','rename','delete'}
 @desc 
 路径操作符：
 $ ： 指向当前Assets文件夹
 % ： 指向当前工程项目文件夹
 PS：可用GUID判断文件是否存在
+
+@string file_name
+@alias 重命名为
+@cond op {'rename'}
+@desc
+
+@boolean is_save_guid 
+@alias 保存guid
+@default true
+@cond op {'rename'}
+@desc
+如果有GUID则保留
 
 @variable-getter show_save_var
 @alias 保存变量
@@ -76,7 +88,7 @@ html：使用HTML解析
 
 @variable-getter save_exist_var
 @alias 结果变量
-@cond op {'exist_file','is_directory'}
+@cond op {'exist_file','is_directory','rename','delete'}
 
 @option op_encoding {'gbk','utf-8','utf8','ascii','base64','base64url','binary','hex','latin1','ucs-2','ucs2','utf16le'}
 @alias 文件编码 {gbk,utf-8,utf8,ascii,base64,base64url,binary,hex,latin1,ucs-2,ucs2,utf16le}
@@ -230,7 +242,7 @@ class File_xr {
 		};
 		if (text.startsWith("$")) {
 			text = text.slice(1, text.length);
-			return File.route("Assets") + "/" + text;
+			return trans_char(File.route("Assets")) + "/" + text;
 		} else if (text.startsWith("%")) {
 			text = text.slice(1, text.length);
 			return trans_char(File.route("")) + "/" + text;
@@ -294,19 +306,84 @@ export default class File_xr_once {
 				}
 				break;
 			case "show_file":
-				let _path = File_xr.compiltePath(this.file_path);
-				if (_path.lastIndexOf(".") !== -1) {
-					_path = _path.substring(0, _path.lastIndexOf("/"));
-				}
-				let file_item = fs.readdirSync(_path);
-				if (this.show_add_prefix) {
-					let new_file_item = [];
-					for (let i of file_item) {
-						new_file_item.push(_path + "/" + i);
+				{
+					let _path = File_xr.compiltePath(this.file_path);
+					try {
+						if (!fs.statSync(_path).isDirectory()) {
+							_path = _path.substring(0, _path.lastIndexOf("/"));
+						}
+						let file_item = fs.readdirSync(_path);
+						if (this.show_add_prefix) {
+							let new_file_item = [];
+							for (let i of file_item) {
+								new_file_item.push(_path + "/" + i);
+							}
+							file_item = new_file_item;
+						}
+						this.show_save_var?.set(file_item);
+					} catch {
+						this.show_save_var?.set(false);
 					}
-					file_item = new_file_item;
 				}
-				this.show_save_var?.set(file_item);
+				break;
+			case "rename":
+				{
+					let _path = File_xr.compiltePath(this.file_path);
+					try {
+						if (!fs.statSync(_path).isDirectory()) {
+							// 文件重命名
+							let old_name = _path.substring(_path.lastIndexOf("/") + 1);
+							let old_suffix = old_name.substring(old_name.lastIndexOf("."));
+							let _str = old_name.substring(0, old_name.lastIndexOf("."));
+							let _path_old_guid = _str.substring(_str.lastIndexOf(".") + 1);
+							let new_path =
+								_path.substring(0, _path.lastIndexOf("/")) +
+								"/" +
+								this.file_name +
+								old_suffix;
+							if (this.is_save_guid) {
+								new_path =
+									_path.substring(0, _path.lastIndexOf("/")) +
+									"/" +
+									this.file_name +
+									`.${_path_old_guid}` +
+									old_suffix;
+							}
+							try {
+								fs.renameSync(_path, new_path);
+								this.save_exist_var?.set(true);
+							} catch {
+								this.save_exist_var?.set(false);
+							}
+						} else {
+							// 文件夹重命名
+							let _path_p = _path.substring(0, _path.lastIndexOf("/"));
+							try {
+								fs.renameSync(_path, _path_p + "/" + this.file_name);
+								this.save_exist_var?.set(true);
+							} catch {
+								this.save_exist_var?.set(false);
+							}
+						}
+					} catch {
+						this.save_exist_var?.set(false);
+					}
+				}
+				break;
+			case "delete":
+				{
+					let _path = File_xr.compiltePath(this.file_path);
+					try {
+						if (fs.statSync(_path).isDirectory()) {
+							fs.rmdirSync(_path, { recursive: true });
+						} else {
+							fs.unlinkSync(_path);
+						}
+						this.save_exist_var?.set(true);
+					} catch {
+						this.save_exist_var?.set(false);
+					}
+				}
 				break;
 		}
 	}

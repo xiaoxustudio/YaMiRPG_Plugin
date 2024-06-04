@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2024-06-03 00:41:40
+ * @LastEditTime: 2024-06-03 22:08:42
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin 文件操作
-@version 1.2
+@version 1.3
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc
@@ -20,12 +20,12 @@ $ ： 指向当前Assets文件夹
 PS：可用GUID判断文件是否存在
 PS：我们统一用的是/作为路径分割符
 
-@option op {'read_file','write_file','exist_file','is_directory','show_file','rename','delete'}
-@alias 操作 {读取文件,写入文件,文件是否存在,是否是目录,列出目录,重命名文件/文件夹,删除文件/文件夹}
+@option op {'read_file','write_file','exist_file','is_directory','show_file','get_info','rename','delete'}
+@alias 操作 {读取文件,写入文件,文件是否存在,是否是目录,列出目录,获取文件/夹信息,重命名文件/夹,删除文件/夹}
 
 @string file_path
 @alias 文件路径
-@cond op {'read_file','write_file','exist_file','show_file','is_directory','rename','delete'}
+@cond op {'read_file','write_file','exist_file','show_file','is_directory','rename','delete','get_info'}
 @desc 
 路径操作符：
 $ ： 指向当前Assets文件夹
@@ -88,7 +88,7 @@ html：使用HTML解析
 
 @variable-getter save_exist_var
 @alias 结果变量
-@cond op {'exist_file','is_directory','rename','delete'}
+@cond op {'exist_file','is_directory','rename','delete','get_info'}
 
 @option op_encoding {'gbk','utf-8','utf8','ascii','base64','base64url','binary','hex','latin1','ucs-2','ucs2','utf16le'}
 @alias 文件编码 {gbk,utf-8,utf8,ascii,base64,base64url,binary,hex,latin1,ucs-2,ucs2,utf16le}
@@ -135,7 +135,7 @@ class File_xr {
 			return false;
 		}
 	}
-	static get_glocal(str) {
+	static get_global(str) {
 		for (let i in Variable.groups) {
 			for (let k in Variable.groups[i]) {
 				if (str == Variable.groups[i][k].name) {
@@ -147,21 +147,21 @@ class File_xr {
 	}
 	static compileVar(msg) {
 		// 将字符串里面的变量编译为文本
-		let regex = /<(.*?):(.*?)>+/g;
+		let regex = /<(\S+):(\S+)>+/g;
 		let matches = [];
 		let match;
 		// 内置变量
 		let mapTo = {
-			actor: "triggerActor",
-			cactor: "casterActor",
-			skill: "triggerSkill",
-			state: "triggerState",
-			equip: "triggerEquipment",
-			item: "triggerItem",
-			object: "triggerObject",
-			light: "triggerLight",
-			region: "triggerRegion",
-			elem: "triggerElement",
+			xactor: "triggerActor",
+			xcactor: "casterActor",
+			xskill: "triggerSkill",
+			xstate: "triggerState",
+			xequip: "triggerEquipment",
+			xitem: "triggerItem",
+			xobject: "triggerObject",
+			xlight: "triggerLight",
+			xregion: "triggerRegion",
+			xelem: "triggerElement",
 		};
 		while ((match = regex.exec(msg)) !== null) {
 			matches.push({ type: match[1], content: match[2] });
@@ -324,6 +324,14 @@ export default class File_xr_once {
 					} catch {
 						this.show_save_var?.set(false);
 					}
+				}
+				break;
+			case "get_info":
+				let _path = File_xr.compiltePath(this.file_path);
+				try {
+					this.save_exist_var?.set(Object.values(fs.statSync(_path)));
+				} catch {
+					this.save_exist_var?.set(false);
 				}
 				break;
 			case "rename":

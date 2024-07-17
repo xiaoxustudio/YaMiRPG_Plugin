@@ -12,7 +12,8 @@
 如果可以的话，希望在游戏后面加个徐然先生的名字，加个插件名字也是ok的
 当然这不是必须的，就当作是对本人的宣传了  
 
-源码分析：https://api.xiaoxustudio.top/
+源码分析：https://api.xiaoxustudio.top/  
+
 编辑器基础教程（非官方）：https://www.bilibili.com/read/cv20724208/?spm_id_from=333.976.0.0
 
 ## Yami API

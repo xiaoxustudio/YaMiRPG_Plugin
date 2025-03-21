@@ -1,6 +1,6 @@
 /* 
 @plugin 移动端-安卓API
-@version 1.0
+@version 1.10
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -9,9 +9,37 @@
 
 注意：本指令仅适用于徐然安卓壳，在其他壳下无法正常运行。
 
-@option emitCommand {"退出APP","弹出提示","弹出通知栏消息","TapTap集成"}
+@option emitCommand {"生命周期","退出APP","弹出提示","弹出通知栏消息","TapTap集成"}
 @alias API
 @desc 调用API
+
+@file LifeCycle_created
+@filter event
+@alias 界面创建
+@desc 
+App首次进入时调用
+@cond emitCommand {'生命周期'}
+
+@file LifeCycle_activeDestroy
+@filter event
+@alias 主动退出
+@desc 
+App调用退出App时调用
+@cond emitCommand {'生命周期'}
+
+@file LifeCycle_front
+@filter event
+@alias 恢复前台
+@desc 
+App从后台恢复到前台时调用
+@cond emitCommand {'生命周期'}
+
+@file LifeCycle_background
+@filter event
+@alias 进入后台
+@desc 
+App没有销毁进入后台时调用
+@cond emitCommand {'生命周期'}
 
 @string titleString
 @alias 标题
@@ -137,6 +165,16 @@ declare global {
 	interface Window {
 		JSApi?: {
 			/**
+			 * @description: 生命周期
+			 * @return {*}
+			 */
+			lifeCycle: (
+				create_id: string,
+				destroy_id: string,
+				front_id: string,
+				background_id: string
+			) => void;
+			/**
 			 * @description: 退出App
 			 * @return {*}
 			 */
@@ -184,10 +222,17 @@ declare global {
 /** 自定义指令脚本 */
 export default class Mobile_AndroidApi implements Script<Command> {
 	EventFileCallBack: any;
+
+	LifeCycle_created: any;
+	LifeCycle_activeDestroy: any;
+	LifeCycle_front: any;
+	LifeCycle_background: any;
+
 	titleString: string;
 	contentString: string;
 	emitCommand: string;
 	emitCommandTapTap: string;
+
 	TapTap_clientId: string;
 	TapTap_clientToken: string;
 	TapTap_region: number;
@@ -211,6 +256,10 @@ export default class Mobile_AndroidApi implements Script<Command> {
 	TapTapAchievementUnlock_isStep: boolean;
 	TapTapAchievementUnlock_stepValue: number;
 	constructor() {
+		this.LifeCycle_created = "";
+		this.LifeCycle_activeDestroy = "";
+		this.LifeCycle_front = "";
+		this.LifeCycle_background = "";
 		this.titleString = "";
 		this.contentString = "";
 		this.emitCommand = "";
@@ -244,6 +293,15 @@ export default class Mobile_AndroidApi implements Script<Command> {
 	}
 	call(): void {
 		switch (this.emitCommand) {
+			case "生命周期":
+				if (this.checkEnv())
+					window.JSApi?.lifeCycle(
+						this.LifeCycle_created,
+						this.LifeCycle_activeDestroy,
+						this.LifeCycle_front,
+						this.LifeCycle_background
+					);
+				break;
 			case "退出APP":
 				if (this.checkEnv()) window.JSApi?.exitApp();
 				break;

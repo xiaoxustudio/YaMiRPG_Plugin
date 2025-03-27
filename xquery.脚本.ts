@@ -1,6 +1,6 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2025-03-26 23:08:52
+ * @LastEditTime: 2025-03-27 17:22:20
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
@@ -103,6 +103,65 @@ const UIElementInstance = {
 	root: RootElement,
 } as const;
 
+const eventTypeMap = {
+	common: "",
+	update: "update",
+	create: "onCreate",
+	load: "onLoad",
+	autorun: "onStart",
+	collision: "onCollision",
+	hittrigger: "onHitTrigger",
+	hitactor: "onHitActor",
+	destroy: "onDestroy",
+	playerenter: "onPlayerEnter",
+	playerleave: "onPlayerLeave",
+	actorenter: "onActorEnter",
+	actorleave: "onActorLeave",
+	skillcast: "onSkillCast",
+	skilladd: "onSkillAdd",
+	skillremove: "onSkillRemove",
+	stateadd: "onStateAdd",
+	stateremove: "onStateRemove",
+	equipmentadd: "onEquipmentAdd",
+	equipmentremove: "onEquipmentRemove",
+	equipmentgain: "",
+	itemuse: "onItemUse",
+	itemgain: "",
+	moneygain: "",
+	keydown: "onKeyDown",
+	keyup: "onKeyUp",
+	mousedown: "onMouseDown",
+	mousedownLB: "onMouseDownLB",
+	mousedownRB: "onMouseDownRB",
+	mouseup: "onMouseUp",
+	mouseupLB: "onMouseUpLB",
+	mouseupRB: "onMouseUpRB",
+	mousemove: "onMouseMove",
+	mouseenter: "onMouseEnter",
+	mouseleave: "onMouseLeave",
+	click: "onClick",
+	doubleclick: "onDoubleClick",
+	wheel: "onWheel",
+	touchstart: "onTouchStart",
+	touchmove: "onTouchMove",
+	touchend: "onTouchEnd",
+	select: "onSelect",
+	deselect: "onDeselect",
+	input: "onInput",
+	focus: "onFocus",
+	blur: "onBlur",
+	ended: "onEnded",
+	gamepadbuttonpress: "onGamepadButtonPress",
+	gamepadbuttonrelease: "onGamepadButtonRelease",
+	gamepadleftstickchange: "onGamepadLeftStickChange",
+	gamepadrightstickchange: "onGamepadRightStickChange",
+	startup: "onStartup",
+	createscene: "onSceneCreate",
+	loadscene: "onSceneLoad",
+	loadsave: "onSaveLoad",
+	preload: "onPreload",
+};
+
 type ElementNames = keyof typeof UIElementInstance;
 
 const ReversedUIElementInstance = (() => {
@@ -115,6 +174,46 @@ const ReversedUIElementInstance = (() => {
 	}
 	return result;
 })();
+
+class XEventManager {
+	map: Record<string, WeakMap<Function, Object>>;
+	unique = 0;
+	constructor() {
+		this.map = {};
+	}
+	GenId(type?: string) {
+		return `xQuery_${type}_${++this.unique}`;
+	}
+	get(type: string, cb?: Function) {
+		if (cb) {
+			return this.map[type].get(cb);
+		}
+		return this.map[type];
+	}
+	has(type: string, cb: Function) {
+		return this.map[type].get(cb) ? true : false;
+	}
+	add(type: string, cb: Function, instance: Object) {
+		if (this.get(type)) {
+			if (!this.has(type, cb)) {
+				this.map[type] = new WeakMap().set(cb, instance);
+			}
+		} else {
+			this.map[type] = new WeakMap().set(cb, instance);
+		}
+	}
+	remove(type: string, cb: Function) {
+		if (this.get(type)) {
+			if (cb) {
+				if (this.has(type, cb)) {
+					this.map[type].delete(cb);
+				}
+			} else {
+				delete this.map[type];
+			}
+		}
+	}
+}
 
 class xQuery {
 	static _instance: any;
@@ -595,11 +694,53 @@ class xQuery {
 	id(val: string) {
 		return this._operatePrototype("entityId", val);
 	}
+	on(type: string, callback = () => {}) {
+		for (const e of this.getElems()) {
+			// @ts-ignore
+			if (!e?.XEventManager) {
+				// @ts-ignore
+				e.XEventManager = new XEventManager();
+			}
+			const instance = new (class {
+				[eventTypeMap[type as keyof typeof eventTypeMap]]() {
+					callback();
+				}
+			})();
+			Object.defineProperty(instance.constructor, "name", {
+				// @ts-ignore
+				value: (e.XEventManager as XEventManager).GenId(type),
+			});
+			// @ts-ignore
+			const xe = e.XEventManager as XEventManager;
+			xe.add(type, callback, instance);
+			e.script.add(instance);
+		}
+	}
+	off(type: string, callback: Function) {
+		for (const e of this.getElems()) {
+			const instance = e.script;
+			// @ts-ignore
+			const xe = e.XEventManager as XEventManager;
+			const cbInstance = xe.get(type, callback);
+			instance.remove(cbInstance);
+			xe.remove(type, callback);
+		}
+	}
 }
 
 export default class xQueryScript implements Script<Plugin> {
 	onStart() {
 		Object.setPrototypeOf(xQuery.query, xQuery);
 		window.$ = window.xQuery = xQuery.query;
+		// @ts-ignore
+		const dom = $("window > button[name=读取存档]");
+		const handle = () => {
+			console.log("徐然123");
+		};
+		dom.on("click", handle);
+		dom.on("click", () => {
+			console.log("asdasdasd");
+		});
+		console.log(dom);
 	}
 }

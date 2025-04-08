@@ -1,13 +1,13 @@
 /*
  * @Author: xuranXYS
- * @LastEditTime: 2025-03-27 17:22:20
+ * @LastEditTime: 2025-04-08 22:37:26
  * @GitHub: www.github.com/xiaoxustudio
  * @WebSite: www.xiaoxustudio.top
  * @Description: By xuranXYS
  */
 /*
 @plugin Xquery
-@version 2.0
+@version 2.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -540,8 +540,41 @@ class xQuery {
 		return Promise.resolve(xhr);
 	}
 
-	/* ——————————————————实例方法———————————————————— */
+	static createElem(
+		name: ElementNames,
+		attrs: (MiniUIElementData & { [k: string]: any }) | null = null,
+		...children: UIElement[] | xQuery[]
+	) {
+		const newXquery = new xQuery();
+		if (!Object.keys(UIElementInstance).includes(name)) return newXquery;
+		const instance = new UIElementInstance[name](
+			UIElementInstance[name].defaultData as any
+		);
+		if (attrs !== null) {
+			for (let i in attrs) {
+				Object.defineProperty(instance, i, {
+					value: attrs[i],
+					configurable: true,
+					enumerable: true,
+				});
+			}
+		}
+		children.forEach(v => {
+			if (v instanceof xQuery) {
+				instance.appendChildren(v.getElems());
+			} else if (v instanceof UIElement) {
+				instance.appendChild(v);
+			}
+		});
+		newXquery.pushElem(instance);
+		return newXquery;
+	}
 
+	/* ——————————————————实例方法———————————————————— */
+	pushElem(...Elems: UIElement[]) {
+		Elems.forEach((v, index) => (this[index] = v));
+		return this;
+	}
 	getElems(): UIElement[] {
 		const parts: UIElement[] = [];
 		const keys = Object.keys(this).filter(v => typeof +v === "number");
@@ -732,15 +765,5 @@ export default class xQueryScript implements Script<Plugin> {
 	onStart() {
 		Object.setPrototypeOf(xQuery.query, xQuery);
 		window.$ = window.xQuery = xQuery.query;
-		// @ts-ignore
-		const dom = $("window > button[name=读取存档]");
-		const handle = () => {
-			console.log("徐然123");
-		};
-		dom.on("click", handle);
-		dom.on("click", () => {
-			console.log("asdasdasd");
-		});
-		console.log(dom);
 	}
 }

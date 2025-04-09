@@ -141,7 +141,7 @@ value如果格式为(value)，则value的值将会被解析为js值
 @cond advanced_op {"add_con"}
 @desc 被链接的任务标识
 
-@string ad_get
+@variable-getter ad_get
 @alias 任务对象变量
 @cond advanced_op {"get_taskkey","set_taskkey"}
 @desc 传入一个任务对象
@@ -453,41 +453,26 @@ class xr {
 					];
 				}
 			}
+			const target = matches[i];
 			//其他类型
-			if (matches[i]["type"] == "local") {
+			if (target["type"] == "local") {
 				for (let k in xr.mapTo) {
-					if (k == matches[i]["content"]) {
-						matches[i]["content"] = xr.mapTo[k as keyof typeof xr.mapTo];
+					if (k == target["content"]) {
+						target["content"] = xr.mapTo[k as keyof typeof xr.mapTo];
 					}
 				}
-				if (typeof CurrentEvent.attributes[matches[i]["content"]] == "object") {
-					return CurrentEvent.attributes[matches[i]["content"]];
+				if (typeof CurrentEvent.attributes[target["content"]] == "object") {
+					return CurrentEvent.attributes[target["content"]];
 				}
 				// 其他变量
-				if (typeof CurrentEvent.attributes[matches[i]["content"]] == "object") {
-					const data = CurrentEvent.attributes[matches[i]["content"]] as any;
-					const ms_l: Record<string, any> = {};
-					for (const obj_name in data) {
-						if (typeof data[obj_name] != "object") {
-							ms_l[obj_name] = data[obj_name];
-						} else {
-							ms_l[obj_name] = xr.convertToJSON(data[obj_name]);
-						}
-					}
-					msg = String(msg).replace(
-						"<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-						xr.convertToJSON(ms_l)
-					);
-				} else {
-					msg = String(msg).replace(
-						"<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-						CurrentEvent.attributes[matches[i]["content"]] as string
-					);
-				}
+				msg = msg.replace(
+					"<" + target["type"] + ":" + target["content"] + ">",
+					CurrentEvent.attributes[target["content"]] as string
+				);
 			}
-			if (matches[i]["type"] == "global") {
-				if (typeof xr.get_global(matches[i]["content"]) == "object") {
-					const data = xr.get_global(matches[i]["content"]) as any;
+			if (target["type"] == "global") {
+				if (typeof xr.get_global(target["content"]) == "object") {
+					const data = xr.get_global(target["content"]) as any;
 					const ms_l: Record<string, any> = {};
 					for (let obj_name in data) {
 						if (typeof data[obj_name] != "object") {
@@ -497,13 +482,13 @@ class xr {
 						}
 					}
 					msg = String(msg).replace(
-						"<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
+						"<" + target["type"] + ":" + target["content"] + ">",
 						xr.convertToJSON(ms_l)
 					);
 				} else {
 					msg = String(msg).replace(
-						"<" + matches[i]["type"] + ":" + matches[i]["content"] + ">",
-						xr.get_global(matches[i]["content"]) as string
+						"<" + target["type"] + ":" + target["content"] + ">",
+						xr.get_global(target["content"]) as string
 					);
 				}
 			}
@@ -648,7 +633,7 @@ export default class rw_xr {
 	inherit_check: boolean;
 	event_complete_callback: string;
 	advanced_op: string;
-	ad_get: string;
+	ad_get?: VariableSetter;
 	ad_exp: string;
 	ad_option: string;
 	ad_save_var: string;
@@ -698,7 +683,6 @@ export default class rw_xr {
 		this.inherit_check = false;
 		this.event_complete_callback = "";
 		this.advanced_op = "";
-		this.ad_get = "";
 		this.ad_exp = "";
 		this.ad_option = "";
 		this.ad_save_var = "";
@@ -1095,17 +1079,13 @@ export default class rw_xr {
 				switch (this.advanced_op) {
 					case "get_taskkey": {
 						try {
-							var ad_data = xr.compileVar(this.ad_get) as any;
+							var ad_data = this.ad_get as Record<string, any>;
 							if (ad_data) {
-								let str_split = String(this.ad_exp).trim().split(",");
+								let str_split = this.ad_exp.trim().split(",");
 								if (this.ad_option != "custom") {
-									str_split = String(this.ad_option).split(",");
+									str_split = this.ad_option.split(",");
 								}
 								if (str_split.length > 1) {
-									// 自己是否是对象，是的话从自身获取
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									// 填充数字键
 									let save_arr: Record<string, any> = {};
 									for (let j = 0; j < str_split.length; j++) {
@@ -1113,10 +1093,6 @@ export default class rw_xr {
 									}
 									CurrentEvent.attributes[this.ad_save_var] = save_arr;
 								} else {
-									// 自己是否是对象，是的话从自身获取
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									CurrentEvent.attributes[this.ad_save_var] = xr.compileVar(
 										ad_data?.[str_split[0]]
 									);
@@ -1129,16 +1105,13 @@ export default class rw_xr {
 					}
 					case "set_taskkey": {
 						try {
-							var ad_data = xr.compileVar(this.ad_get) as any;
+							var ad_data = this.ad_get as Record<string, any>;
 							if (ad_data) {
 								let str_split = String(this.ad_exp).trim().split(",");
 								if (this.ad_option != "custom") {
 									str_split = String(this.ad_option).split(",");
 								}
 								if (str_split.length > 1) {
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									setNestedProperty(
 										String(this.ad_exp),
 										xr.compileVar(String(this.ad_exp_val)),
@@ -1147,9 +1120,6 @@ export default class rw_xr {
 									);
 								} else {
 									// 自己是否是对象，是的话从自身获取
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									let val = xr.compileVar(this.ad_exp_val);
 									ad_data[str_split[0].trim()] = this.not_string
 										? new Function("return " + val)()
@@ -1173,10 +1143,6 @@ export default class rw_xr {
 								// 匹配属性
 								let attr_split = sp.trim().split(",");
 								if (str_split.length > 1) {
-									// 自己是否是对象，是的话从自身获取
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									// 填充数字键
 									let save_arr: Record<string, any> = {};
 									if (ad_data[this.itemkey_type]) {
@@ -1210,10 +1176,6 @@ export default class rw_xr {
 									}
 									CurrentEvent.attributes[this.ad_save_var] = save_arr;
 								} else {
-									// 自己是否是对象，是的话从自身获取
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									if (ad_data[this.itemkey_type]) {
 										ad_data?.[this.itemkey_type]?.forEach(
 											(k: {
@@ -1260,10 +1222,6 @@ export default class rw_xr {
 									.compileVar(this.itemkey_key)
 									.trim()
 									.split(",");
-								// 自己是否是对象，是的话从自身获取
-								if (!(typeof ad_data == "object")) {
-									ad_data = CurrentEvent.attributes[ad_data];
-								}
 								// 匹配属性
 								let attr_split = sp.trim().split(",");
 								let val = xr.compileVar(this.itemkey_val).split(",");
@@ -1305,10 +1263,6 @@ export default class rw_xr {
 									}
 								} else {
 									let val = xr.compileVar(this.itemkey_val);
-									// 自己是否是对象，是的话从自身获取
-									if (!(typeof ad_data == "object")) {
-										ad_data = CurrentEvent.attributes[ad_data];
-									}
 									if (ad_data[this.itemkey_type]) {
 										ad_data?.[this.itemkey_type]?.forEach(
 											(k: { [x: string]: any }) => {

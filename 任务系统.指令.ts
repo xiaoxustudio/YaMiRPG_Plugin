@@ -1,6 +1,6 @@
 /*
 @plugin 任务系统
-@version 1.6.0
+@version 1.6.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -758,8 +758,8 @@ export default class rw_xr {
 		}
 		switch (shell) {
 			case "electron": {
-				const saveDir = Loader.route("$/Save");
-				const dataPath = Loader.route(`$/Save/save_xr${suffix}.save`);
+				const saveDir = Loader.route("./Save");
+				const dataPath = Loader.route(`./Save/save_xr${suffix}.save`);
 				let struct = {
 					current: this.current_rw,
 					current_b: this.current_rw_branch,
@@ -817,7 +817,7 @@ export default class rw_xr {
 				await void 0;
 				try {
 					// 同步读取存档数据文件
-					const path = Loader.route(`$/Save/save_xr${suffix}.save`);
+					const path = Loader.route(`./Save/save_xr${suffix}.save`);
 					const json = require("fs").readFileSync(path);
 					let res = JSON.parse(json);
 					this.current_rw = res.current;
@@ -858,7 +858,7 @@ export default class rw_xr {
 		}
 		switch (shell) {
 			case "electron": {
-				const dataPath = Loader.route(`$/Save/save_xr${suffix}.save`);
+				const dataPath = Loader.route(`./Save/save_xr${suffix}.save`);
 				const fsp = require("fs").promises;
 				return Promise.all([
 					// 异步删除元数据和存档数据

@@ -1,6 +1,6 @@
 /*
 @plugin 任务系统
-@version 1.6.1
+@version 1.6.2
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -505,24 +505,30 @@ class xr {
  * @return {*}
  */
 function setNestedProperty(
-	a: string,
-	b: string,
+	a: string | string[],
 	obj: Record<string, any>,
 	not_str = false
 ) {
-	const pathArr = a.split(",");
+	const pathArr = Array.isArray(a) ? a : a.split(",");
 	const propName = pathArr.pop();
 	let nestedObj = obj;
-	for (const path of pathArr) {
+	for (let index = 0; index <= pathArr.length; index++) {
+		const path = pathArr[index];
+		if (index === pathArr.length - 1) {
+			nestedObj[path] = not_str
+				? new Function("return " + propName?.trim())()
+				: propName;
+
+			break;
+		}
 		if (
 			!nestedObj.hasOwnProperty(path) ||
 			typeof nestedObj[path] !== "object"
 		) {
-			nestedObj[path] = {};
+			new Error_xr(`设置嵌套层级出错：${path}`, CurrentEvent, new Event(""));
 		}
 		nestedObj = nestedObj[path];
 	}
-	nestedObj[propName!] = not_str ? new Function("return " + b)() : b;
 	return obj;
 }
 /**
@@ -1109,19 +1115,21 @@ export default class rw_xr {
 							if (ad_data) {
 								let str_split = String(this.ad_exp).trim().split(",");
 								if (this.ad_option != "custom") {
-									str_split = String(this.ad_option).split(",");
+									str_split = String(this.ad_exp_val).split(",");
 								}
 								if (str_split.length > 1) {
 									setNestedProperty(
-										String(this.ad_exp),
-										xr.compileVar(String(this.ad_exp_val)),
-										ad_data,
+										str_split,
+										this.ad_option != "custom"
+											? ad_data[this.ad_option]
+											: ad_data,
 										this.not_string
 									);
 								} else {
+									const k = str_split[0].trim();
 									// 自己是否是对象，是的话从自身获取
-									let val = xr.compileVar(this.ad_exp_val);
-									ad_data[str_split[0].trim()] = this.not_string
+									let val = xr.compileVar(this.ad_exp_val.trim());
+									ad_data[k] = this.not_string
 										? new Function("return " + val)()
 										: val;
 								}
@@ -1395,7 +1403,7 @@ export default class rw_xr {
 		switch (d_data.type) {
 			case "elem": {
 				try {
-					data_now = UI.get(d_data.id);
+					data_now = UI.get(d_data.id) || UI.presets[d_data.id];
 				} catch (e) {
 					new Error_xr("(解析)元素类型错误：", CurrentEvent, e);
 				}
@@ -1643,8 +1651,8 @@ export default class rw_xr {
 					if (reg.test(keyval)) {
 						let _arr = keyval.match(reg);
 						if (_arr && !custom_item_ex.hasOwnProperty(_arr[1])) {
-							const key = xr.compileVar(_arr[1]) as string;
-							custom_item_ex[key] = xr.compileVar(_arr[2]);
+							const key = xr.compileVar(_arr[1].trim()) as string;
+							custom_item_ex[key] = xr.compileVar(_arr[2].trim());
 						}
 					} else {
 						continue;
@@ -1715,8 +1723,8 @@ export default class rw_xr {
 					if (reg.test(keyval)) {
 						let _arr = keyval.match(reg);
 						if (_arr && !custom_item_ex.hasOwnProperty(_arr[1])) {
-							const key = xr.compileVar(_arr[1]) as string;
-							custom_item_ex[key] = xr.compileVar(_arr[2]);
+							const key = xr.compileVar(_arr[1].trim()) as string;
+							custom_item_ex[key] = xr.compileVar(_arr[2].trim());
 						}
 					} else {
 						continue;
@@ -1816,7 +1824,7 @@ export default class rw_xr {
 				let aci = Party.player?.inventory;
 				let acs = Party.player?.skill;
 				let acst = Party.player?.state;
-				const itemId = item.id;
+				const itemId = String(item.id).trim();
 				// 如果是物品
 				if (item.type == "item") {
 					// 判断id是否存在，存在就在里面取数量

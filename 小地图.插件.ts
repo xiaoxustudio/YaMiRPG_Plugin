@@ -1,0 +1,478 @@
+/*
+@plugin 小地图
+@version 1.0
+@author 徐然
+@link https://space.bilibili.com/291565199
+@desc 
+
+在场景加载完成后显示简易小地图，显示角色和障碍物等对象分布。
+公共方法：
+window.Minimap.hide() // 隐藏小地图
+window.Minimap.show() // 显示小地图
+window.Minimap.render() // 绘制地图
+window.Minimap.setPosition(position, options) // 设置小地图位置，参数：position: 位置类型，options: 可选参数，offsetX: 偏移量X，offsetY: 偏移量Y，x: 自定义位置X，y: 自定义位置Y
+
+@number width
+@alias 小地图宽度
+@default 200
+
+@number height
+@alias 小地图高度
+@default 200
+
+@color playerColor
+@alias 玩家点颜色
+@default 00ff00ff
+
+@color actorColor
+@alias 角色点颜色
+@default 0000ffff
+
+@color enemyColor
+@alias 敌人点颜色
+
+@color triggerColor
+@alias 触发器颜色
+@default ffff00ff
+
+@color obstacleColor
+@alias 障碍点颜色
+@default 00000000
+
+@string[] layerColor
+@alias 层级颜色
+@desc 当为空时，将自行计算颜色，否则使用自定义颜色
+@default ['','','']
+
+@color borderColor
+@alias 边框颜色
+@default ffffffff
+
+@number borderWidth
+@alias 边框宽度
+@default 2
+
+@number minScale
+@alias 最小缩放比例
+@default 1
+
+@number maxScale
+@alias 最大缩放比例
+@default 2
+
+@option position {"right-top", "right-bottom","left-top","left-bottom","custom-position"}
+@alias 小地图初始位置 {右上,右下,左上,左下,自定义位置}
+@default right-top
+
+
+@variable-number positionOffsetX
+@alias 小地图X偏移
+@default 0
+@cond position {"right-top", "right-bottom","left-top","left-bottom"}
+
+
+@variable-number positionOffsetY
+@alias 小地图y偏移
+@default 0
+@cond position {"right-top", "right-bottom","left-top","left-bottom"}
+
+
+@variable-number positionX
+@alias 小地图自定义位置X
+@cond position {"custom-position"}
+@default 0
+
+@variable-number positionY
+@alias 小地图自定义位置Y
+@cond position {"custom-position"}
+@default 0
+*/
+
+export default class Minimap implements Script<Plugin> {
+  width!: number
+  height!: number
+  playerColor!: string
+  enemyColor!: string
+  actorColor!: string
+  obstacleColor!: string
+  borderColor!: string
+  borderWidth!: number
+  minScale!: number
+  maxScale!: number
+  scale: number = 1
+  position!: string
+
+  // 脚本属性
+  enabled: boolean = false
+  canvas!: HTMLCanvasElement
+  ctx!: CanvasRenderingContext2D
+  positionX!: number
+  positionY!: number
+  positionOffsetX!: number
+  positionOffsetY!: number
+  colorMode!: string
+  layerColor!: string
+  triggerColor!: string
+  /** 已经请求加载但尚未完成的纹理GUID集合 */
+  private _loadingImages: Set<string> = new Set()
+  private bgCanvas?: HTMLCanvasElement
+  private bgCtx?: CanvasRenderingContext2D
+  private bgDirty: boolean = true
+
+  constructor() {
+    (window as any).Minimap = this
+  }
+
+  onStart(): void {
+    Scene.on('load', scene => {
+      this.enabled = true
+      this.createCanvas()
+      this.bgCanvas = undefined
+      this.bgCtx = undefined
+      this.bgDirty = true
+      this._loadingImages.clear()
+      scene.renderers.push(this)
+    })
+  }
+
+  createCanvas(): void {
+    if (!this.canvas) {
+      this.canvas = document.createElement('canvas')
+      this.canvas.width = this.width
+      this.canvas.height = this.height
+      this.ctx = this.canvas.getContext('2d')!
+      // 禁用平滑缩放，保持像素风格
+      this.ctx.imageSmoothingEnabled = false
+        ; (this.ctx as any).webkitImageSmoothingEnabled = false
+        ; (this.ctx as any).msImageSmoothingEnabled = false
+      this.canvas.style.imageRendering = 'pixelated'
+      this.canvas.style.position = 'absolute'
+      this.canvas.style.zIndex = '1000'
+      this.canvas.style.pointerEvents = 'auto'
+      this._updateCanvasPosition()
+      document.body.appendChild(this.canvas)
+      this.canvas.addEventListener('wheel', (e) => {
+        e.preventDefault()
+        e.stopPropagation() // 阻止冒泡，避免影响主摄像机缩放
+        if (e.deltaY < 0) {
+          this.scale = Math.min(this.maxScale, this.scale * 1.1)
+        } else {
+          this.scale = Math.max(this.minScale, this.scale / 1.1)
+        }
+        this.render()
+      }, { passive: false })
+    }
+  }
+
+  render(): void {
+    if (!this.enabled || !Scene.binding) return
+    const scene = Scene.binding
+    const ctx = this.ctx
+    ctx.clearRect(0, 0, this.width, this.height)
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, 0, this.width, this.height)
+    ctx.clip()
+
+    // 以摄像机中心为缩放原点，保证玩家点在缩放后仍位于小地图中心
+    const cameraCenterX = Camera.scrollCenterX / scene.tileWidth
+    const cameraCenterY = Camera.scrollCenterY / scene.tileHeight
+    let shiftX = cameraCenterX * this.width / scene.width
+    let shiftY = cameraCenterY * this.height / scene.height
+
+    // 视图限制：仅当视图面积小于场景面积时才进行裁剪，
+    // 若场景尺寸不足以填满视图，允许出现边缘留白以保持跟随效果
+    const viewWidth = this.width / this.scale
+    const viewHeight = this.height / this.scale
+
+    const halfViewW = viewWidth / 2
+    const halfViewH = viewHeight / 2
+
+    if (Party.player) {
+      // 基于玩家位置调整视图中心，确保玩家始终可见
+      const playerPx = Party.player.x * this.width / scene.width
+      const playerPy = Party.player.y * this.height / scene.height
+      shiftX = playerPx
+      shiftY = playerPy
+    }
+
+    // clamp 以避免出现空白区域（无条件，保证左右和上下都局限在场景范围）
+    shiftX = Math.clamp(shiftX, halfViewW, this.width - halfViewW)
+    shiftY = Math.clamp(shiftY, halfViewH, this.height - halfViewH)
+
+    // 先将原点移动到小地图中心，再根据缩放系数放大/缩小，最后把世界坐标系移动到摄像机中心
+    ctx.translate(this.width / 2, this.height / 2)
+    ctx.scale(this.scale, this.scale)
+    ctx.translate(-shiftX, -shiftY)
+
+    if (!this.bgCanvas) this.bgDirty = true
+
+    if (this.bgDirty) {
+      Callback.push(() => {
+        this._rebuildBackground(scene)
+      })
+      this.bgDirty = false
+    }
+
+    if (this.bgCanvas) {
+      ctx.drawImage(this.bgCanvas, 0, 0)
+    }
+    // 绘制障碍物
+    ctx.fillStyle = Color.parseCSSColor(this.obstacleColor)
+    for (let y = 0; y < scene.height; y++) {
+      for (let x = 0; x < scene.width; x++) {
+        if (scene.obstacle.get(x, y)) {
+          const px = Math.floor(x * this.width / scene.width)
+          const py = Math.floor(y * this.height / scene.height)
+          ctx.fillRect(px, py, 2, 2)
+        }
+      }
+    }
+    // 绘制玩家
+    ctx.fillStyle = Color.parseCSSColor(this.playerColor)
+    const player = Party.player
+    if (player) {
+      const px = Math.floor(player.x * this.width / scene.width)
+      const py = Math.floor(player.y * this.height / scene.height)
+      ctx.fillRect(px - 1, py - 1, 3, 3)
+    }
+    // 绘制角色
+    for (const actor of scene.actor.list) {
+      if (actor === player) continue
+      if (Team.isEnemy(actor.teamId, player?.teamId ?? "")) {
+        ctx.fillStyle = Color.parseCSSColor(this.enemyColor)
+      } else {
+        ctx.fillStyle = Color.parseCSSColor(this.actorColor)
+      }
+      const px = Math.floor(actor.x * this.width / scene.width)
+      const py = Math.floor(actor.y * this.height / scene.height)
+      ctx.fillRect(px - 1, py - 1, 3, 3)
+    }
+    // 绘制触发器
+    ctx.fillStyle = Color.parseCSSColor(this.triggerColor)
+    for (const trigger of scene.trigger.list) {
+      const px = Math.floor(trigger.x * this.width / scene.width)
+      const py = Math.floor(trigger.y * this.height / scene.height)
+      ctx.fillRect(px - 1, py - 1, 3, 3)
+    }
+    // 绘制边框
+    if (this.borderWidth > 0) {
+      ctx.save()
+      ctx.strokeStyle = Color.parseCSSColor(this.borderColor)
+      ctx.lineWidth = this.borderWidth
+      ctx.strokeRect(
+        this.borderWidth / 2,
+        this.borderWidth / 2,
+        this.width - this.borderWidth,
+        this.height - this.borderWidth
+      )
+      ctx.restore()
+    }
+    ctx.restore()
+  }
+
+  onDestroy(): void {
+    if (this.canvas && this.canvas.parentNode) {
+      this.canvas.parentNode.removeChild(this.canvas)
+    }
+    this.enabled = false
+  }
+
+  /**
+   * 隐藏小地图
+   */
+  hide(): void {
+    if (this.canvas) {
+      this.canvas.style.display = 'none'
+    }
+    this.enabled = false
+  }
+
+  /**
+   * 显示小地图
+   */
+  show(): void {
+    if (!this.canvas) {
+      this.createCanvas()
+    }
+    if (this.canvas) {
+      this.canvas.style.display = 'block'
+    }
+    this.enabled = true
+    this.render()
+  }
+
+  /** 重建背景缓存 */
+  private _rebuildBackground(scene: SceneContext): void {
+    if (!this.bgCanvas) {
+      this.bgCanvas = document.createElement('canvas')
+      this.bgCanvas.width = this.width
+      this.bgCanvas.height = this.height
+    }
+    this.bgCtx = this.bgCanvas.getContext('2d')!
+    // 背景层同样关闭平滑
+    this.bgCtx.imageSmoothingEnabled = false
+    const ctx = this.bgCtx
+    ctx.clearRect(0, 0, this.width, this.height)
+
+    let drewAny = false
+    if (scene.parallax && scene.parallax.tilemaps) {
+      // 按 order 排序，保证绘制层级一致
+      const sortedMaps = [...scene.parallax.tilemaps].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+      let index = 0
+      for (const tilemap of sortedMaps) {
+        if (!(tilemap as any).tiles) continue
+        if (!tilemap.visible) continue
+        const tiles = (tilemap as any).tiles
+        const width = (tilemap as any).width
+        const height = (tilemap as any).height
+        const tileData = (tilemap as any).tileData
+        const LoaderRef = Loader
+        const dw = Math.max(1, Math.ceil(this.width / scene.width))
+        const dh = Math.max(1, Math.ceil(this.height / scene.height))
+
+        for (let ty = 0; ty < height; ty++) {
+          for (let tx = 0; tx < width; tx++) {
+            const tileIdx = tx + ty * width
+            const tileId = tiles[tileIdx]
+            if (!tileId) continue
+            const data = tileData[tileId & 0xffffff00]
+            if (!data) continue
+
+            let guid: string | undefined
+            let sx = 0, sy = 0, sw = 0, sh = 0
+
+            if (data.type === 'normal') {
+              const tileset = data.tileset
+              guid = tileset.image
+              sw = tileset.tileWidth
+              sh = tileset.tileHeight
+              sx = sw * data.x
+              sy = sh * data.y
+            } else if (data.type === 'auto') {
+              const tileset = data.tileset
+              const autoTile = data.autoTile
+              const nodeId = tileId & 0b111111
+              const node = data.template?.nodes[nodeId]
+              if (!node) continue
+              const frame = node.frames[0]
+              const frameX = frame & 0xff
+              const frameY = frame >> 8
+              guid = autoTile.image
+              sw = tileset.tileWidth
+              sh = tileset.tileHeight
+              sx = (autoTile.x + frameX) * sw
+              sy = (autoTile.y + frameY) * sh
+            }
+
+            const startX = (tilemap as any).tileStartX ?? tilemap.x
+            const startY = (tilemap as any).tileStartY ?? tilemap.y
+            const px = Math.floor((startX + tx) * this.width / scene.width)
+            const py = Math.floor((startY + ty) * this.height / scene.height)
+
+            let drawn = false
+
+            if (guid && LoaderRef) {
+              const img: HTMLImageElement | null = LoaderRef.getImage ? LoaderRef.getImage({ guid }) : null
+              if (img && img.complete) {
+                ctx.drawImage(img, sx, sy, sw, sh, px, py, dw, dh)
+                drawn = true
+                drewAny = true
+              } else {
+                // 若纹理未准备好则异步加载
+                if (!this._loadingImages.has(guid) && LoaderRef.loadImage) {
+                  this._loadingImages.add(guid)
+                  LoaderRef.loadImage({ guid }).then(() => {
+                    this._loadingImages.delete(guid)
+                    this.bgDirty = true // 纹理加载完后重新构建背景
+                  }).catch(() => {
+                    this._loadingImages.delete(guid)
+                  })
+                }
+              }
+            }
+
+            if (!drawn) {
+              // 绘制默认颜色
+              let color = '#cccccc'
+              if (data.tileset && data.tileset.id) {
+                if (this.layerColor[index]) {
+                  color = Color.parseCSSColor(this.layerColor[index])
+                } else {
+                  const hash = Array.from(String(data.tileset.id)).reduce((a, c) => a + (typeof c === 'string' ? c.charCodeAt(0) : 0), 0)
+                  color = `hsl(${hash % 360},60%,70%)`
+                }
+              }
+              ctx.fillStyle = color
+              ctx.fillRect(px, py, dw, dh)
+              drewAny = true
+            }
+          }
+        }
+        index++
+      }
+    }
+    if (!drewAny) {
+      this.bgDirty = true
+    }
+  }
+
+  /**
+   * 根据当前 position / offsetX / offsetY / positionX / positionY 更新 Canvas 的 CSS 坐标
+   */
+  private _updateCanvasPosition(): void {
+    if (!this.canvas) return
+    this.canvas.style.top = ''
+    this.canvas.style.bottom = ''
+    this.canvas.style.left = ''
+    this.canvas.style.right = ''
+    switch ((this.position || 'right-top').toLowerCase()) {
+      case 'right-top':
+        this.canvas.style.right = `${16 + this.positionOffsetX}px`
+        this.canvas.style.top = `${16 + this.positionOffsetY}px`
+        break
+      case 'right-bottom':
+        this.canvas.style.right = `${16 + this.positionOffsetX}px`
+        this.canvas.style.bottom = `${16 + this.positionOffsetY}px`
+        break
+      case 'left-top':
+        this.canvas.style.left = `${16 + this.positionOffsetX}px`
+        this.canvas.style.top = `${16 + this.positionOffsetY}px`
+        break
+      case 'left-bottom':
+        this.canvas.style.left = `${16 + this.positionOffsetX}px`
+        this.canvas.style.bottom = `${16 + this.positionOffsetY}px`
+        break
+      case 'custom-position':
+        this.canvas.style.left = `${this.positionX}px`
+        this.canvas.style.top = `${this.positionY}px`
+        break
+      default:
+        this.canvas.style.right = `${16 + this.positionOffsetX}px`
+        this.canvas.style.top = `${16 + this.positionOffsetY}px`
+    }
+  }
+
+  /**
+   * 设置小地图位置，调用后立即更新 canvas 样式
+   * @param position 预设位置("right-top" | "right-bottom" | "left-top" | "left-bottom" | "custom-position")
+   * @param options  可选参数：
+   *        offsetX / offsetY  —  预设位置模式下的偏移量
+   *        x / y             —  自定义坐标，仅在 custom-position 时有效
+   */
+  public setPosition(position: string, options: {
+    offsetX?: number,
+    offsetY?: number,
+    x?: number,
+    y?: number
+  } = {}): void {
+    this.position = position
+    this.positionOffsetX = options.offsetX ?? this.positionOffsetX
+    this.positionOffsetY = options.offsetY ?? this.positionOffsetY
+    if (position.toLowerCase() === 'custom-position') {
+      this.positionX = options.x ?? this.positionX
+      this.positionY = options.y ?? this.positionY
+    }
+    this._updateCanvasPosition()
+  }
+}

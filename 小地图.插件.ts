@@ -1,6 +1,6 @@
 /*
 @plugin 小地图
-@version 1.0
+@version 1.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -20,16 +20,48 @@ window.Minimap.setPosition(position, options) // 设置小地图位置，参数�
 @alias 小地图高度
 @default 200
 
+@boolean fogEnabled
+@alias 迷雾效果
+@desc
+开启后，小地图会显示迷雾效果，迷雾效果会根据迷雾半径和迷雾颜色来显示
+存档大小也会随着迷雾效果的开启而增加，慎用！！！
+
+@default false
+
+@color fogColor
+@alias 迷雾颜色
+@default 000000ff
+
+@number fogRadius
+@alias 迷雾半径
+@default 10
+
+@option playerMode {"avatar","color"}
+@alias 玩家显示 {头像,颜色}
+@default avatar
+
 @color playerColor
 @alias 玩家点颜色
 @default 00ff00ff
+@cond playerMode {"color"}
 
-@color actorColor
-@alias 角色点颜色
+@option memberMode {"avatar","color"}
+@alias 队友显示 {头像,颜色}
+@default avatar
+
+@color memberColor
+@alias 队友点颜色
 @default 0000ffff
+@cond memberMode {"color"}
+
+@option enemyMode {"avatar","color"}
+@alias 敌人显示 {头像,颜色}
+@default avatar
 
 @color enemyColor
 @alias 敌人点颜色
+@default 000000ff
+@cond enemyMode {"color"}
 
 @color triggerColor
 @alias 触发器颜色
@@ -93,7 +125,7 @@ export default class Minimap implements Script<Plugin> {
   height!: number
   playerColor!: string
   enemyColor!: string
-  actorColor!: string
+  memberColor!: string
   obstacleColor!: string
   borderColor!: string
   borderWidth!: number
@@ -101,6 +133,13 @@ export default class Minimap implements Script<Plugin> {
   maxScale!: number
   scale: number = 1
   position!: string
+  // --- Fog of war properties ---
+  fogEnabled!: boolean
+  fogColor!: string
+  fogRadius!: number
+  playerMode!: string
+  memberMode!: string
+  enemyMode!: string
 
   // 脚本属性
   enabled: boolean = false
@@ -113,6 +152,13 @@ export default class Minimap implements Script<Plugin> {
   colorMode!: string
   layerColor!: string
   triggerColor!: string
+  /** 探索记录：true 表示已探索 */
+  private explored: boolean[][] = []
+  /** Fog overlay canvas */
+  private fogCanvas?: HTMLCanvasElement
+  private fogCtx?: CanvasRenderingContext2D
+  /** 场景 -> 探索记录映射 */
+  private exploredByScene: Map<string, boolean[][]> = new Map()
   /** 已经请求加载但尚未完成的纹理GUID集合 */
   private _loadingImages: Set<string> = new Set()
   private bgCanvas?: HTMLCanvasElement
@@ -121,6 +167,105 @@ export default class Minimap implements Script<Plugin> {
 
   constructor() {
     (window as any).Minimap = this
+
+    // ---- Patch SceneContext.saveData once ----
+    const SceneContextRef: any = SceneContext || (Scene as any).contexts?.constructor?.prototype?.constructor
+    if (SceneContextRef && !SceneContextRef.__minimapPatched) {
+      const originalSaveData = SceneContextRef.prototype.saveData
+      SceneContextRef.prototype.saveData = function (this: any) {
+        const data = originalSaveData.call(this)
+        // 获取 Minimap 实例
+        const minimap = (window as any).Minimap as Minimap | undefined
+        if (minimap) {
+          const explored = minimap.exploredByScene.get(this.id)
+          if (explored) {
+            // 深拷贝避免后续修改影响存档
+            data.minimapExplored = explored.map((row: boolean[]) => row.slice())
+          }
+        }
+        return data
+      }
+      SceneContextRef.__minimapPatched = true
+    }
+
+    // ---- Patch Data.saveGameData / loadGameData once ----
+    const DataRef: any = Data
+    if (DataRef && !DataRef.__minimapPatched) {
+      // Patch saveGameData
+      const originalSaveGameData = DataRef.saveGameData
+      DataRef.saveGameData = async function (index: number, meta: any) {
+        const minimap = (window as any).Minimap as Minimap | undefined
+        // 执行原本保存逻辑
+        await originalSaveGameData.call(this, index, meta)
+        if (!minimap) return
+        // 追加迷雾数据到存档文件
+        const suffix = index.toString().padStart(2, '0')
+        const exploredObj: { [key: string]: boolean[][] } = {}
+        minimap.exploredByScene.forEach((value, key) => {
+          exploredObj[key] = value
+        })
+        try {
+          switch (Stats.shell) {
+            case 'electron': {
+              const path = Loader.routeSave(`Save/save${suffix}.save`)
+              const fs = require('fs')
+              const json = JSON.parse(fs.readFileSync(path, 'utf8'))
+              json.minimapExplored = exploredObj
+              fs.writeFileSync(path, Stats.debug ? JSON.stringify(json, null, 2) : JSON.stringify(json))
+              break
+            }
+            case 'browser': {
+              const key = `save${suffix}.save`
+              const json = await IDB.getItem(key)
+              if (json) {
+                json.minimapExplored = exploredObj
+                await IDB.setItem(key, json)
+              }
+              break
+            }
+          }
+        } catch (e) { console.warn(e) }
+      }
+
+      // Patch loadGameData
+      const originalLoadGameData = DataRef.loadGameData
+      DataRef.loadGameData = async function (index: number) {
+        const suffix = index.toString().padStart(2, '0')
+        // 先读取存档文件中的迷雾数据
+        let minimapData: any
+        try {
+          switch (Stats.shell) {
+            case 'electron': {
+              const path = Loader.routeSave(`Save/save${suffix}.save`)
+              const fs = require('fs')
+              const json = JSON.parse(fs.readFileSync(path, 'utf8'))
+              minimapData = json.minimapExplored
+              break
+            }
+            case 'browser': {
+              const key = `save${suffix}.save`
+              const json = await IDB.getItem(key)
+              minimapData = json?.minimapExplored
+              break
+            }
+          }
+        } catch (e) { console.warn(e) }
+
+        // 调用原始加载逻辑
+        await originalLoadGameData.call(this, index)
+
+        // 加载完游戏后，将迷雾数据写回 Minimap
+        if (minimapData && (window as any).Minimap) {
+          const minimap = (window as any).Minimap as Minimap
+          minimap.exploredByScene = new Map<string, boolean[][]>()
+          Object.keys(minimapData).forEach(sceneId => {
+            minimap.exploredByScene.set(sceneId, minimapData[sceneId])
+          })
+        }
+      }
+
+      DataRef.__minimapPatched = true
+    }
   }
 
   onStart(): void {
@@ -131,7 +276,33 @@ export default class Minimap implements Script<Plugin> {
       this.bgCtx = undefined
       this.bgDirty = true
       this._loadingImages.clear()
+      // 载入或初始化探索记录
+      let record = scene.savedData?.minimapExplored as boolean[][] | undefined
+      if (!record) record = this.exploredByScene.get(scene.id)
+      if (!record || record.length !== scene.height || record[0]?.length !== scene.width) {
+        record = Array.from({ length: scene.height }, () => Array(scene.width).fill(false))
+        this.exploredByScene.set(scene.id, record)
+      }
+      this.explored = record
+
+      // 初始化 fogCanvas
+      if (!this.fogCanvas) {
+        this.fogCanvas = document.createElement('canvas')
+        this.fogCanvas.width = this.width
+        this.fogCanvas.height = this.height
+        this.fogCtx = this.fogCanvas.getContext('2d')!
+        this.fogCtx.imageSmoothingEnabled = false
+      }
+      // 填充全部迷雾颜色后按已探索数据清除
+      this._rebuildFog(scene)
+
       scene.renderers.push(this)
+    })
+    // 在场景销毁时保存探索数据(可选，因映射中存的是引用，这里主要保证引用一致)
+    Scene.on('destroy', scene => {
+      if (scene && this.explored) {
+        this.exploredByScene.set(scene.id, this.explored)
+      }
     })
   }
 
@@ -229,24 +400,87 @@ export default class Minimap implements Script<Plugin> {
       }
     }
     // 绘制玩家
-    ctx.fillStyle = Color.parseCSSColor(this.playerColor)
     const player = Party.player
     if (player) {
       const px = Math.floor(player.x * this.width / scene.width)
       const py = Math.floor(player.y * this.height / scene.height)
-      ctx.fillRect(px - 1, py - 1, 3, 3)
+      if (this.playerMode === 'avatar' && player.portrait) {
+        const img: HTMLImageElement | null = Loader.getImage ? Loader.getImage({ guid: player.portrait }) : null
+        const size = 4
+        if (img && img.complete) {
+          const clip = player.clip || [0,0,img.width,img.height]
+          const [sx,sy,sw,sh] = clip
+          ctx.drawImage(img, sx, sy, sw, sh, px - (size >> 1), py - (size >> 1), size, size)
+        } else if (player.portrait && Loader.loadImage && !this._loadingImages.has(player.portrait)) {
+          this._loadingImages.add(player.portrait)
+          Loader.loadImage({ guid: player.portrait }).then(() => {
+            this._loadingImages.delete(player.portrait)
+          }).catch(() => this._loadingImages.delete(player.portrait))
+        } else {
+          ctx.fillStyle = Color.parseCSSColor(this.playerColor)
+          ctx.fillRect(px - 1, py - 1, 3, 3)
+        }
+      } else {
+        ctx.fillStyle = Color.parseCSSColor(this.playerColor)
+        ctx.fillRect(px - 1, py - 1, 3, 3)
+      }
+    }
+    // 更新探索区域
+    if (this.fogEnabled && player) {
+      const radius = Math.max(0, this.fogRadius | 0)
+      const tx0 = Math.floor(player.x)
+      const ty0 = Math.floor(player.y)
+      const r2 = radius * radius
+      for (let dy = -radius; dy <= radius; dy++) {
+        const dy2 = dy * dy
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (dx * dx + dy2 > r2) continue // 圆形范围外
+          const tx = tx0 + dx
+          const ty = ty0 + dy
+          if (tx >= 0 && tx < scene.width && ty >= 0 && ty < scene.height) {
+            if (this.explored[ty] && !this.explored[ty][tx]) {
+              this.explored[ty][tx] = true
+              // 清除迷雾像素
+              if (this.fogCtx) {
+                const dw = Math.max(1, Math.ceil(this.width / scene.width))
+                const dh = Math.max(1, Math.ceil(this.height / scene.height))
+                const px = Math.floor(tx * this.width / scene.width)
+                const py = Math.floor(ty * this.height / scene.height)
+                this.fogCtx.clearRect(px, py, dw, dh)
+              }
+            }
+          }
+        }
+      }
     }
     // 绘制角色
     for (const actor of scene.actor.list) {
       if (actor === player) continue
-      if (Team.isEnemy(actor.teamId, player?.teamId ?? "")) {
-        ctx.fillStyle = Color.parseCSSColor(this.enemyColor)
-      } else {
-        ctx.fillStyle = Color.parseCSSColor(this.actorColor)
-      }
+      const isEnemy = Team.isEnemy(actor.teamId, player ? player.teamId : "")
+      const mode = isEnemy ? this.enemyMode : this.memberMode
+      const color = isEnemy ? this.enemyColor : this.memberColor
       const px = Math.floor(actor.x * this.width / scene.width)
       const py = Math.floor(actor.y * this.height / scene.height)
-      ctx.fillRect(px - 1, py - 1, 3, 3)
+      if (mode === 'avatar' && actor.portrait) {
+        const img: HTMLImageElement | null = Loader.getImage ? Loader.getImage({ guid: actor.portrait }) : null
+        const size = 4
+        if (img && img.complete) {
+          const clip = actor.clip || [0, 0, img.width, img.height]
+          const [sx, sy, sw, sh] = clip
+          ctx.drawImage(img, sx, sy, sw, sh, px - (size >> 1), py - (size >> 1), size, size)
+        } else if (!this._loadingImages.has(actor.portrait) && Loader.loadImage) {
+          this._loadingImages.add(actor.portrait)
+          Loader.loadImage({ guid: actor.portrait }).then(() => this._loadingImages.delete(actor.portrait)).catch(() => this._loadingImages.delete(actor.portrait))
+          ctx.fillStyle = Color.parseCSSColor(color)
+          ctx.fillRect(px - 1, py - 1, 3, 3)
+        } else {
+          ctx.fillStyle = Color.parseCSSColor(color)
+          ctx.fillRect(px - 1, py - 1, 3, 3)
+        }
+      } else {
+        ctx.fillStyle = Color.parseCSSColor(color)
+        ctx.fillRect(px - 1, py - 1, 3, 3)
+      }
     }
     // 绘制触发器
     ctx.fillStyle = Color.parseCSSColor(this.triggerColor)
@@ -254,6 +488,10 @@ export default class Minimap implements Script<Plugin> {
       const px = Math.floor(trigger.x * this.width / scene.width)
       const py = Math.floor(trigger.y * this.height / scene.height)
       ctx.fillRect(px - 1, py - 1, 3, 3)
+    }
+    // 绘制未探索区域（迷雾）
+    if (this.fogEnabled && this.fogCanvas) {
+      ctx.drawImage(this.fogCanvas, 0, 0)
     }
     // 绘制边框
     if (this.borderWidth > 0) {
@@ -474,5 +712,26 @@ export default class Minimap implements Script<Plugin> {
       this.positionY = options.y ?? this.positionY
     }
     this._updateCanvasPosition()
+  }
+
+  /** 重新生成整张迷雾图 */
+  private _rebuildFog(scene: SceneContext): void {
+    if (!this.fogEnabled || !this.fogCtx) return
+    const ctx = this.fogCtx
+    ctx.clearRect(0, 0, this.width, this.height)
+    ctx.fillStyle = Color.parseCSSColor(this.fogColor)
+    ctx.fillRect(0, 0, this.width, this.height)
+    const dw = Math.max(1, Math.ceil(this.width / scene.width))
+    const dh = Math.max(1, Math.ceil(this.height / scene.height))
+    ctx.clearRect(0, 0, 0, 0) // ensure path
+    for (let y = 0; y < scene.height; y++) {
+      for (let x = 0; x < scene.width; x++) {
+        if (this.explored[y][x]) {
+          const px = Math.floor(x * this.width / scene.width)
+          const py = Math.floor(y * this.height / scene.height)
+          ctx.clearRect(px, py, dw, dh)
+        }
+      }
+    }
   }
 }

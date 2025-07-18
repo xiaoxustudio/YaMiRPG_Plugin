@@ -161,16 +161,12 @@ export default class ScenerPlugin implements Script<Command> {
 
 		GlobalActor.prototype.transferToScene = function (x, y) {
 			let scene = Scene.binding;
-			if (!scene) {
+			if (!scene || this.destroyed) {
 				return;
 			}
 
-			if (this.destroyed) {
-				return;
-			}
-
-			//在转移非全局角色时需要借助这个函数来实现
-			//需要将它们排除掉
+			// 在转移非全局角色时需要借助这个函数来实现
+			// 需要将它们排除掉
 			if (this instanceof GlobalActor) {
 				for (let i in ActorManager.idMap) {
 					if (
@@ -195,14 +191,16 @@ export default class ScenerPlugin implements Script<Command> {
 
 			if (this.parent == scene.actor) {
 				//说明在这个场景里面，移动就行了
+				this.target.reset();
 				this.setPosition(x, y);
 				this?.navigator?.stopMoving();
-				this.target.reset();
+				(this as any).updateSceneActorData();
 			} else {
 				this.parent?.remove(this);
+				this.target.reset();
 				this.setPosition(x, y);
 				this?.navigator?.stopMoving();
-				this.target.reset();
+				(this as any).updateSceneActorData();
 				scene.actor.append(this);
 			}
 		};
@@ -214,6 +212,7 @@ export default class ScenerPlugin implements Script<Command> {
 	}
 
 	loadCurrentSceneData(data: { sceneData: any; itemData: any }) {
+		CurrentEvent.continue();
 		const localScene = Scene as any;
 		//填充场景数据
 		const sceneData = Data.getScene(data.sceneData.id);
@@ -265,6 +264,7 @@ export default class ScenerPlugin implements Script<Command> {
 				//加载场景
 				let teams: any[] | null = null;
 				(async () => {
+					CurrentEvent.pause()
 					await void 0;
 					let current = Scene.binding;
 
@@ -275,27 +275,13 @@ export default class ScenerPlugin implements Script<Command> {
 
 						for (let i = count - 1; i >= 0; i--) {
 							let actor = actors.list[i];
-							if (!actor.active) {
-								continue;
-							}
-
-							if (actor.destroyed) {
+							if (!actor.active || actor.destroyed) {
 								continue;
 							}
 
 							if (Party.player && actor.teamId == Party.player.teamId) {
-								if (!actor.isActive()) {
+								if (!actor.isActive() || actor.attributes.dontTransfer || (!(actor instanceof GlobalActor) && transferMember == 1)) {
 									continue;
-								}
-
-								if (actor.attributes.dontTransfer) {
-									continue;
-								}
-
-								if (transferMember == 1) {
-									if (!(actor instanceof GlobalActor)) {
-										continue;
-									}
 								}
 
 								actor.parent?.remove(actor);
@@ -334,11 +320,9 @@ export default class ScenerPlugin implements Script<Command> {
 							Party.player?.transferToScene(pos.x + 0.5, pos.y + 0.5);
 						}
 					}
-					CurrentEvent.continue();
 				});
 
-				//离开前暂停当前场景
-				return CurrentEvent.pause();
+				return;
 			case 2:
 				//保存场景
 				this.saveCurrentSceneData();

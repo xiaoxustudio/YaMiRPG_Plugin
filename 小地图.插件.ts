@@ -1,6 +1,6 @@
 /*
 @plugin 小地图
-@version 1.1
+@version 1.12
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc 
@@ -19,6 +19,21 @@ window.Minimap.setPosition(position, options) // 设置小地图位置，参数�
 @number height
 @alias 小地图高度
 @default 200
+
+@number mobileIconScale
+@alias 移动端图标缩放
+@desc 移动端下的图标缩放比例，用于调整角色头像、图块等大小
+@default 0.7
+
+@boolean autoScale
+@alias 自动缩放
+@desc 开启后，小地图会根据设备类型自动调整大小
+@default true
+
+@number mobileScale
+@alias 移动端缩放比例
+@desc 移动端下的缩放比例，仅在自动缩放开启时生效
+@default 0.7
 
 @boolean fogEnabled
 @alias 迷雾效果
@@ -138,6 +153,9 @@ export default class Minimap implements Script<Plugin> {
 	scale: number = 1;
 	position!: string;
 	shape!: string;
+	autoScale!: boolean;
+	mobileScale!: number;
+	mobileIconScale!: number;
 	// --- Fog of war properties ---
 	fogEnabled!: boolean;
 	fogColor!: string;
@@ -287,6 +305,11 @@ export default class Minimap implements Script<Plugin> {
 	}
 
 	onStart(): void {
+		// 检测是否为移动端并应用缩放
+		if (this.autoScale && Stats.isMobile()) {
+			this.scale = this.mobileScale;
+		}
+
 		Scene.on("load", scene => {
 			this.enabled = true;
 			this.createCanvas();
@@ -369,6 +392,7 @@ export default class Minimap implements Script<Plugin> {
 		if (!this.enabled || !Scene.binding) return;
 		const scene = Scene.binding;
 		const ctx = this.ctx;
+		const isMobile = Stats.isMobile();
 		// 清除画布并填充透明背景
 		ctx.clearRect(0, 0, this.width, this.height);
 		ctx.fillStyle = "rgba(0, 0, 0, 0)";
@@ -400,15 +424,23 @@ export default class Minimap implements Script<Plugin> {
 
 		if (Party.player) {
 			// 基于玩家位置调整视图中心，确保玩家始终可见
-			const playerPx = (Party.player.x * this.width) / scene.width;
-			const playerPy = (Party.player.y * this.height) / scene.height;
+			let playerPx = (Party.player.x * this.width) / scene.width;
+			let playerPy = (Party.player.y * this.height) / scene.height;
+			
+			// 移动端横屏时需要调整坐标映射
+			if (isMobile) {
+				const temp = playerPx;
+				playerPx = this.width - playerPy;
+				playerPy = temp;
+			}
+			
 			shiftX = playerPx;
 			shiftY = playerPy;
 		}
 
-		// clamp 以避免出现空白区域（无条件，保证左右和上下都局限在场景范围）
-		shiftX = Math.clamp(shiftX, halfViewW, this.width - halfViewW);
-		shiftY = Math.clamp(shiftY, halfViewH, this.height - halfViewH);
+		// clamp 以避免出现空白区域
+		shiftX = Math.min(Math.max(shiftX, halfViewW), this.width - halfViewW);
+		shiftY = Math.min(Math.max(shiftY, halfViewH), this.height - halfViewH);
 
 		// 先将原点移动到小地图中心，再根据缩放系数放大/缩小，最后把世界坐标系移动到摄像机中心
 		ctx.translate(this.width / 2, this.height / 2);
@@ -427,27 +459,46 @@ export default class Minimap implements Script<Plugin> {
 		if (this.bgCanvas) {
 			ctx.drawImage(this.bgCanvas, 0, 0);
 		}
+
 		// 绘制障碍物
 		ctx.fillStyle = Color.parseCSSColor(this.obstacleColor);
+		const obstacleSize = isMobile ? 1.4 * this.mobileIconScale : 2;
 		for (let y = 0; y < scene.height; y++) {
 			for (let x = 0; x < scene.width; x++) {
 				if (scene.obstacle.get(x, y)) {
-					const px = Math.floor((x * this.width) / scene.width);
-					const py = Math.floor((y * this.height) / scene.height);
-					ctx.fillRect(px, py, 2, 2);
+					let px = Math.floor((x * this.width) / scene.width);
+					let py = Math.floor((y * this.height) / scene.height);
+					
+					// 移动端横屏时需要调整坐标映射
+					if (isMobile) {
+						const temp = px;
+						px = this.width - py;
+						py = temp;
+					}
+					
+					ctx.fillRect(px, py, obstacleSize, obstacleSize);
 				}
 			}
 		}
+
 		// 绘制玩家
 		const player = Party.player;
 		if (player) {
-			const px = Math.floor((player.x * this.width) / scene.width);
-			const py = Math.floor((player.y * this.height) / scene.height);
+			let px = Math.floor((player.x * this.width) / scene.width);
+			let py = Math.floor((player.y * this.height) / scene.height);
+			
+			// 移动端横屏时需要调整坐标映射
+			if (isMobile) {
+				const temp = px;
+				px = this.width - py;
+				py = temp;
+			}
+
 			if (this.playerMode === "avatar" && player.portrait) {
 				const img: HTMLImageElement | null = Loader.getImage
 					? Loader.getImage({ guid: player.portrait })
 					: null;
-				const size = 4;
+				const size = isMobile ? 3 * this.mobileIconScale : 4;
 				if (img && img.complete) {
 					const clip = player.clip || [0, 0, img.width, img.height];
 					const [sx, sy, sw, sh] = clip;
@@ -475,54 +526,39 @@ export default class Minimap implements Script<Plugin> {
 						.catch(() => this._loadingImages.delete(player.portrait));
 				} else {
 					ctx.fillStyle = Color.parseCSSColor(this.playerColor);
-					ctx.fillRect(px - 1, py - 1, 3, 3);
+					const dotSize = isMobile ? 2 * this.mobileIconScale : 3;
+					const offset = dotSize / 2;
+					ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
 				}
 			} else {
 				ctx.fillStyle = Color.parseCSSColor(this.playerColor);
-				ctx.fillRect(px - 1, py - 1, 3, 3);
+				const dotSize = isMobile ? 2 * this.mobileIconScale : 3;
+				const offset = dotSize / 2;
+				ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
 			}
 		}
-		// 更新探索区域
-		if (this.fogEnabled && player) {
-			const radius = Math.max(0, this.fogRadius | 0);
-			const tx0 = Math.floor(player.x);
-			const ty0 = Math.floor(player.y);
-			const r2 = radius * radius;
-			for (let dy = -radius; dy <= radius; dy++) {
-				const dy2 = dy * dy;
-				for (let dx = -radius; dx <= radius; dx++) {
-					if (dx * dx + dy2 > r2) continue; // 圆形范围外
-					const tx = tx0 + dx;
-					const ty = ty0 + dy;
-					if (tx >= 0 && tx < scene.width && ty >= 0 && ty < scene.height) {
-						if (this.explored[ty] && !this.explored[ty][tx]) {
-							this.explored[ty][tx] = true;
-							// 清除迷雾像素
-							if (this.fogCtx) {
-								const dw = Math.max(1, Math.ceil(this.width / scene.width));
-								const dh = Math.max(1, Math.ceil(this.height / scene.height));
-								const px = Math.floor((tx * this.width) / scene.width);
-								const py = Math.floor((ty * this.height) / scene.height);
-								this.fogCtx.clearRect(px, py, dw, dh);
-							}
-						}
-					}
-				}
-			}
-		}
+
 		// 绘制角色
 		for (const actor of scene.actor.list) {
 			if (actor === player) continue;
 			const isEnemy = Team.isEnemy(actor.teamId, player ? player.teamId : "");
 			const mode = isEnemy ? this.enemyMode : this.memberMode;
 			const color = isEnemy ? this.enemyColor : this.memberColor;
-			const px = Math.floor((actor.x * this.width) / scene.width);
-			const py = Math.floor((actor.y * this.height) / scene.height);
+			let px = Math.floor((actor.x * this.width) / scene.width);
+			let py = Math.floor((actor.y * this.height) / scene.height);
+			
+			// 移动端横屏时需要调整坐标映射
+			if (isMobile) {
+				const temp = px;
+				px = this.width - py;
+				py = temp;
+			}
+
 			if (mode === "avatar" && actor.portrait) {
 				const img: HTMLImageElement | null = Loader.getImage
 					? Loader.getImage({ guid: actor.portrait })
 					: null;
-				const size = 4;
+				const size = isMobile ? 3 * this.mobileIconScale : 4;
 				if (img && img.complete) {
 					const clip = actor.clip || [0, 0, img.width, img.height];
 					const [sx, sy, sw, sh] = clip;
@@ -546,46 +582,65 @@ export default class Minimap implements Script<Plugin> {
 						.then(() => this._loadingImages.delete(actor.portrait))
 						.catch(() => this._loadingImages.delete(actor.portrait));
 					ctx.fillStyle = Color.parseCSSColor(color);
-					ctx.fillRect(px - 1, py - 1, 3, 3);
+					const dotSize = isMobile ? 2 * this.mobileIconScale : 3;
+					const offset = dotSize / 2;
+					ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
 				} else {
 					ctx.fillStyle = Color.parseCSSColor(color);
-					ctx.fillRect(px - 1, py - 1, 3, 3);
+					const dotSize = isMobile ? 2 * this.mobileIconScale : 3;
+					const offset = dotSize / 2;
+					ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
 				}
 			} else {
 				ctx.fillStyle = Color.parseCSSColor(color);
-				ctx.fillRect(px - 1, py - 1, 3, 3);
+				const dotSize = isMobile ? 2 * this.mobileIconScale : 3;
+				const offset = dotSize / 2;
+				ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
 			}
 		}
+
 		// 绘制触发器
 		ctx.fillStyle = Color.parseCSSColor(this.triggerColor);
 		for (const trigger of scene.trigger.list) {
-			const px = Math.floor((trigger.x * this.width) / scene.width);
-			const py = Math.floor((trigger.y * this.height) / scene.height);
-			ctx.fillRect(px - 1, py - 1, 3, 3);
+			let px = Math.floor((trigger.x * this.width) / scene.width);
+			let py = Math.floor((trigger.y * this.height) / scene.height);
+			
+			// 移动端横屏时需要调整坐标映射
+			if (isMobile) {
+				const temp = px;
+				px = this.width - py;
+				py = temp;
+			}
+
+			const dotSize = isMobile ? 2 * this.mobileIconScale : 3;
+			const offset = dotSize / 2;
+			ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
 		}
+
 		// 绘制未探索区域（迷雾）
 		if (this.fogEnabled && this.fogCanvas) {
 			ctx.drawImage(this.fogCanvas, 0, 0);
 		}
+
 		// 绘制边框
 		if (this.borderWidth > 0) {
 			ctx.save();
 			ctx.strokeStyle = Color.parseCSSColor(this.borderColor);
-			ctx.lineWidth = this.borderWidth;
+			ctx.lineWidth = isMobile ? this.borderWidth * this.mobileIconScale : this.borderWidth;
 			if (this.shape === "circle") {
 				if (this.scale === 1) {
 					const radius =
-						Math.min(this.width, this.height) / 2 - this.borderWidth / 2;
+						Math.min(this.width, this.height) / 2 - ctx.lineWidth / 2;
 					ctx.beginPath();
 					ctx.arc(this.width / 2, this.height / 2, radius, 0, Math.PI * 2);
 					ctx.stroke();
 				}
 			} else {
 				ctx.strokeRect(
-					this.borderWidth / 2,
-					this.borderWidth / 2,
-					this.width - this.borderWidth,
-					this.height - this.borderWidth
+					ctx.lineWidth / 2,
+					ctx.lineWidth / 2,
+					this.width - ctx.lineWidth,
+					this.height - ctx.lineWidth
 				);
 			}
 			ctx.restore();
@@ -638,6 +693,8 @@ export default class Minimap implements Script<Plugin> {
 		ctx.clearRect(0, 0, this.width, this.height);
 
 		let drewAny = false;
+		const isMobile = Stats.isMobile();
+
 		if (scene.parallax && scene.parallax.tilemaps) {
 			// 按 order 排序，保证绘制层级一致
 			const sortedMaps = [...scene.parallax.tilemaps].sort(
@@ -694,8 +751,15 @@ export default class Minimap implements Script<Plugin> {
 
 						const startX = (tilemap as any).tileStartX ?? tilemap.x;
 						const startY = (tilemap as any).tileStartY ?? tilemap.y;
-						const px = Math.floor(((startX + tx) * this.width) / scene.width);
-						const py = Math.floor(((startY + ty) * this.height) / scene.height);
+						let px = Math.floor(((startX + tx) * this.width) / scene.width);
+						let py = Math.floor(((startY + ty) * this.height) / scene.height);
+
+						// 移动端横屏时需要调整坐标映射
+						if (isMobile) {
+							const temp = px;
+							px = this.width - py;
+							py = temp;
+						}
 
 						let drawn = false;
 
@@ -704,7 +768,17 @@ export default class Minimap implements Script<Plugin> {
 								? LoaderRef.getImage({ guid })
 								: null;
 							if (img && img.complete) {
-								ctx.drawImage(img, sx, sy, sw, sh, px, py, dw, dh);
+								ctx.save();
+								if (isMobile) {
+									// 在移动端横屏时，需要旋转每个图块
+									ctx.translate(px + dw/2, py + dh/2);
+									ctx.rotate(Math.PI / 2);
+									ctx.translate(-dw/2, -dh/2);
+									ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dh, dw);
+								} else {
+									ctx.drawImage(img, sx, sy, sw, sh, px, py, dw, dh);
+								}
+								ctx.restore();
 								drawn = true;
 								drewAny = true;
 							} else {
@@ -738,7 +812,16 @@ export default class Minimap implements Script<Plugin> {
 								}
 							}
 							ctx.fillStyle = color;
-							ctx.fillRect(px, py, dw, dh);
+							if (isMobile) {
+								ctx.save();
+								ctx.translate(px + dw/2, py + dh/2);
+								ctx.rotate(Math.PI / 2);
+								ctx.translate(-dw/2, -dh/2);
+								ctx.fillRect(0, 0, dh, dw);
+								ctx.restore();
+							} else {
+								ctx.fillRect(px, py, dw, dh);
+							}
 							drewAny = true;
 						}
 					}
@@ -760,30 +843,65 @@ export default class Minimap implements Script<Plugin> {
 		this.canvas.style.bottom = "";
 		this.canvas.style.left = "";
 		this.canvas.style.right = "";
-		switch ((this.position || "right-top").toLowerCase()) {
-			case "right-top":
-				this.canvas.style.right = `${16 + this.positionOffsetX}px`;
-				this.canvas.style.top = `${16 + this.positionOffsetY}px`;
-				break;
-			case "right-bottom":
-				this.canvas.style.right = `${16 + this.positionOffsetX}px`;
-				this.canvas.style.bottom = `${16 + this.positionOffsetY}px`;
-				break;
-			case "left-top":
-				this.canvas.style.left = `${16 + this.positionOffsetX}px`;
-				this.canvas.style.top = `${16 + this.positionOffsetY}px`;
-				break;
-			case "left-bottom":
-				this.canvas.style.left = `${16 + this.positionOffsetX}px`;
-				this.canvas.style.bottom = `${16 + this.positionOffsetY}px`;
-				break;
-			case "custom-position":
-				this.canvas.style.left = `${this.positionX}px`;
-				this.canvas.style.top = `${this.positionY}px`;
-				break;
-			default:
-				this.canvas.style.right = `${16 + this.positionOffsetX}px`;
-				this.canvas.style.top = `${16 + this.positionOffsetY}px`;
+
+		const isMobile = Stats.isMobile();
+		const position = (this.position || "right-top").toLowerCase();
+
+		// 移动端横屏时调整位置
+		if (isMobile) {
+			switch (position) {
+				case "right-top":
+					this.canvas.style.bottom = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.right = `${16 + this.positionOffsetY}px`;
+					break;
+				case "right-bottom":
+					this.canvas.style.top = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.right = `${16 + this.positionOffsetY}px`;
+					break;
+				case "left-top":
+					this.canvas.style.bottom = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.left = `${16 + this.positionOffsetY}px`;
+					break;
+				case "left-bottom":
+					this.canvas.style.top = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.left = `${16 + this.positionOffsetY}px`;
+					break;
+				case "custom-position":
+					// 移动端横屏时，交换x和y坐标，并调整方向
+					this.canvas.style.bottom = `${this.positionX}px`;
+					this.canvas.style.right = `${this.positionY}px`;
+					break;
+				default:
+					this.canvas.style.bottom = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.right = `${16 + this.positionOffsetY}px`;
+			}
+		} else {
+			// PC端保持原有逻辑
+			switch (position) {
+				case "right-top":
+					this.canvas.style.right = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.top = `${16 + this.positionOffsetY}px`;
+					break;
+				case "right-bottom":
+					this.canvas.style.right = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.bottom = `${16 + this.positionOffsetY}px`;
+					break;
+				case "left-top":
+					this.canvas.style.left = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.top = `${16 + this.positionOffsetY}px`;
+					break;
+				case "left-bottom":
+					this.canvas.style.left = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.bottom = `${16 + this.positionOffsetY}px`;
+					break;
+				case "custom-position":
+					this.canvas.style.left = `${this.positionX}px`;
+					this.canvas.style.top = `${this.positionY}px`;
+					break;
+				default:
+					this.canvas.style.right = `${16 + this.positionOffsetX}px`;
+					this.canvas.style.top = `${16 + this.positionOffsetY}px`;
+			}
 		}
 	}
 
@@ -807,8 +925,14 @@ export default class Minimap implements Script<Plugin> {
 		this.positionOffsetX = options.offsetX ?? this.positionOffsetX;
 		this.positionOffsetY = options.offsetY ?? this.positionOffsetY;
 		if (position.toLowerCase() === "custom-position") {
-			this.positionX = options.x ?? this.positionX;
-			this.positionY = options.y ?? this.positionY;
+			if (Stats.isMobile()) {
+				// 移动端横屏时，交换x和y坐标
+				this.positionX = options.y ?? this.positionX;
+				this.positionY = options.x ?? this.positionY;
+			} else {
+				this.positionX = options.x ?? this.positionX;
+				this.positionY = options.y ?? this.positionY;
+			}
 		}
 		this._updateCanvasPosition();
 	}

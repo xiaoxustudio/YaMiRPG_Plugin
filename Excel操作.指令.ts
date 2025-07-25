@@ -1,22 +1,31 @@
 /*
 @plugin Excel操作
-@version 1.0
+@version 1.1
 @author 徐然
 @link https://space.bilibili.com/291565199
 @desc
 
 Excel操作
-
 默认是从1开始
-
 deps module: exceljs
+PS：读取Excel文件，转换为二维数组在主事件运行，其他操作都是在回调事件运行
 
-@option operation {'read','to-array','get-row','get-column','get-cell'}
-@alias 操作类型 { 读取Excel文件,转换为二维数组,获取行,获取列,获取行列值}
+
+@option operation {'read','write','to-array','get-row','get-column','get-cell','reserve-array'}
+@alias 操作类型 { 读取Excel文件,写入Excel文件,转换为二维数组,获取行,获取列,获取行列值,回送数组}
+@desc
+读取Excel文件：读取Excel文件
+写入Excel文件：写入Excel文件（只能在回调事件中运行）
+转换为二维数组：将Excel文件转换为二维数组
+获取行：获取Excel文件中指定行的数据
+获取列：获取Excel文件中指定列的数据
+获取行列值：获取Excel文件中指定行列的值
+回送数组：将二维数组回送到指定Excel对象中（类似于commit操作），当你修改数据后，需要调用此操作才能将已修改数据提交到Excel对象中
+
 
 @variable-setter getterData
 @alias 操作对象
-@cond operation {'to-array','get-row','get-column'}
+@cond operation {'to-array','get-row','get-column','reserve-array'}
 
 @string filePath
 @alias 文件路径
@@ -25,7 +34,7 @@ deps module: exceljs
 $ ：指向当前Assets文件夹
 % ：指向当前工程项目文件夹
 也可以使用GUID
-@cond operation {'read'}
+@cond operation {'read','write'}
 
 @string outputVariableString
 @alias 输出变量
@@ -34,11 +43,22 @@ $ ：指向当前Assets文件夹
 @number sheetIndex
 @alias 工作表索引
 @default 1
+@desc 第几个工作表，默认从1开始
 @cond operation {'to-array'}
+
+
+@boolean inhertEvent
+@alias 继承
+@default false
+@desc 继承事件上下文
+@cond operation {'to-array'}
+
 
 @file commandFile
 @alias 回调事件
-@desc 本地变量：@result
+@desc 
+本地变量：@index-> 工作表索引、@result-> 转换过后的数据
+
 @filter command
 @cond operation {'to-array'}
 
@@ -58,6 +78,7 @@ $ ：指向当前Assets文件夹
 @alias 忽略空值
 @default false
 @cond operation {'get-row','get-column'}
+
 
 @variable-setter outputVariableRow
 @alias 输出变量
@@ -111,7 +132,14 @@ const ExcelOperations = new (class {
 
 export default class ExcelOperationsCommand implements Script<Command> {
 	// 接口属性
-	operation!: "read" | "to-array" | "get-row" | "get-column" | "get-cell";
+	operation!:
+		| "read"
+		| "write"
+		| "to-array"
+		| "get-row"
+		| "get-column"
+		| "get-cell"
+		| "reserve-array";
 	filePath!: string;
 	commandFile!: string;
 	Index!: number;
@@ -123,6 +151,9 @@ export default class ExcelOperationsCommand implements Script<Command> {
 	outputVariableCell?: VariableSetter;
 	outputVariableString!: string;
 	noEmpty!: boolean;
+	inhertEvent!: boolean;
+
+	defers = Promise.resolve(); // 延迟执行
 
 	// 获取指定行数据
 	getRow(
@@ -228,48 +259,108 @@ export default class ExcelOperationsCommand implements Script<Command> {
 	call() {
 		switch (this.operation) {
 			case "read": {
-				const buffer = fs.readFileSync(this.transformPath(this.filePath));
-				const data = ExcelOperations.readExcel(buffer);
-				// 将读取到的Excel数据存储到变量中
-				Attribute.OBJECT_SET(
-					CurrentEvent.attributes,
-					this.outputVariableString,
-					data
-				);
+				try {
+					const buffer = fs.readFileSync(this.transformPath(this.filePath));
+					const data = ExcelOperations.readExcel(buffer);
+					// 将读取到的Excel数据存储到变量中
+					Attribute.OBJECT_SET(
+						CurrentEvent.attributes,
+						this.outputVariableString,
+						data
+					);
+				} catch (error) {
+					console.warn("读取Excel文件失败", error);
+				}
 				break;
 			}
 			case "to-array": {
-				const sheet = this.getterData?.get() as any;
-				if (!sheet) return;
-				sheet.then((r: any) => {
-					// 初始化二维数组
-					const data: any = [];
-					const worksheet = r.getWorksheet(this.sheetIndex);
-					// 遍历工作表的每一行
-					worksheet.eachRow(
-						{ includeEmpty: true },
-						(row: {
-							eachCell: (
-								arg0: { includeEmpty: boolean },
-								arg1: (cell: any, colNumber: any) => void
-							) => void;
-						}) => {
-							const rowData: any[] = [];
+				try {
+					const sheet = this.getterData?.get() as any;
+					if (!sheet) return;
+					sheet.then((r: any) => {
+						// 初始化二维数组
+						const data: any = [];
+						const worksheet = r.getWorksheet(this.sheetIndex);
+						// 遍历工作表的每一行
+						worksheet.eachRow(
+							{ includeEmpty: true },
+							(row: {
+								eachCell: (
+									arg0: { includeEmpty: boolean },
+									arg1: (cell: any, colNumber: any) => void
+								) => void;
+							}) => {
+								const rowData: any[] = [];
+								// 遍历当前行的每个单元格
+								row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+									// 获取单元格值（空单元格为 null）
+									rowData.push(cell.value === undefined ? null : cell.value);
+								});
 
-							// 遍历当前行的每个单元格
-							row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-								// 获取单元格值（空单元格为 null）
-								rowData.push(cell.value === undefined ? null : cell.value);
+								data.push(rowData);
+							}
+						);
+						const commands = EventManager.guidMap[this.commandFile];
+						if (commands) {
+							const e = new EventHandler(commands);
+							if (this.inhertEvent) e.inheritEventContext(CurrentEvent);
+							Object.defineProperty(e, "excelTarget", {
+								value: sheet,
+								enumerable: true,
 							});
-
-							data.push(rowData);
+							Attribute.SET(e.attributes, "@index", this.sheetIndex);
+							Attribute.OBJECT_SET(e.attributes, "@result", data);
+							EventHandler.call(e);
 						}
-					);
-					const commands = EventManager.guidMap[this.commandFile];
-					if (commands) {
-						const e = new EventHandler(commands);
-						Attribute.OBJECT_SET(e.attributes, "@result", data);
-						return EventHandler.call(e);
+						return r;
+					});
+				} catch (error) {
+					console.warn("转换Excel文件失败", error);
+				}
+				break;
+			}
+			case "write": {
+				const workbook = (CurrentEvent as any).excelTarget;
+				if (!workbook) {
+					console.warn("请在回调事件中保存工作表，否则无法写入Excel文件")
+					return;
+				}
+				const p = this.filePath;
+				this.defers.then(() => {
+					try {
+						workbook.then((workbook: any) => {
+							// 保存到文件
+							const finalPath = this.transformPath(p);
+							const worksheet = workbook.getWorksheet(
+								CurrentEvent.attributes["@index"]
+							);
+							const data: any[][] = [];
+							// 遍历工作表的每一行
+							worksheet.eachRow(
+								{ includeEmpty: true },
+								(row: {
+									eachCell: (
+										arg0: { includeEmpty: boolean },
+										arg1: (cell: any, colNumber: any) => void
+									) => void;
+								}) => {
+									const rowData: any[] = [];
+									// 遍历当前行的每个单元格
+									row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+										// 获取单元格值（空单元格为 null）
+										rowData.push(cell.value === undefined ? null : cell.value);
+									});
+
+									data.push(rowData);
+								}
+							);
+							workbook.xlsx.writeBuffer(finalPath).then((bf: any) => {
+								fs.writeFileSync(finalPath, bf);
+							});
+							return workbook;
+						});
+					} catch (error) {
+						console.error("写入Excel文件失败:", error);
 					}
 				});
 				break;
@@ -308,6 +399,28 @@ export default class ExcelOperationsCommand implements Script<Command> {
 						this.Index
 					)
 				);
+				break;
+			}
+			case "reserve-array": {
+				const data = this.getterData?.get() as any[][];
+				if (!data) return;
+				const target = (CurrentEvent as any).excelTarget;
+				this.defers.then(() => {
+					target.then((r: any) => {
+						const worksheet = r.getWorksheet(CurrentEvent.attributes["@index"]);
+						// 清空现有工作表
+						worksheet.spliceRows(0, worksheet.rowCount);
+						// 将二维数组写入工作表
+						data.forEach((rowData, rowIdx) => {
+							const row = worksheet.getRow(rowIdx + 1);
+							rowData.forEach((cellValue, colIdx) => {
+								row.getCell(colIdx + 1).value = cellValue;
+							});
+							row.commit();
+						});
+						return r;
+					});
+				});
 				break;
 			}
 		}

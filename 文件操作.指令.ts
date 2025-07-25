@@ -44,7 +44,7 @@ PS：可用GUID判断文件是否存在
 @desc
 如果有GUID则保留
 
-@variable-getter show_save_var
+@variable-setter show_save_var
 @alias 保存变量
 @cond op {'show_file'}
 
@@ -63,7 +63,7 @@ json：使用JSON解析
 xml：使用XML解析
 html：使用HTML解析
 
-@variable-getter save_var
+@variable-setter save_var
 @alias 内容保存变量
 @cond op {'read_file'}
 
@@ -82,11 +82,11 @@ html：使用HTML解析
 @cond op {'write_file'}
 
 
-@variable-getter save_res_var
+@variable-setter save_res_var
 @alias 写入结果变量
 @cond op {'write_file'}
 
-@variable-getter save_exist_var
+@variable-setter save_exist_var
 @alias 结果变量
 @cond op {'exist_file','is_directory','rename','delete','get_info'}
 
